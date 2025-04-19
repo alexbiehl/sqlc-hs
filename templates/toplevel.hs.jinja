@@ -1,0 +1,10 @@
+module {{ moduleName }}
+  ( module {{ internalModuleName }},
+    module Queries
+  )
+where
+
+import qualified {{ internalModuleName }}
+{% for module in modules %}
+import qualified {{ module.value }} as Queries
+{% endfor %}

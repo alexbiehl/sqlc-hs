@@ -1,0 +1,97 @@
+cabal-version:      3.4
+name:               sqlc-hs
+version:            0.1.0.0
+
+-- synopsis:
+-- description:
+license:            Apache-2.0
+license-file:       LICENSE
+author:             Alex Hansen
+maintainer:         alex.hansen@gmail.com
+
+-- copyright:
+build-type:         Simple
+extra-doc-files:    CHANGELOG.md
+extra-source-files:
+  templates/internal.mysql.hs.jinja
+  templates/internal.postgresql.hs.jinja
+  templates/internal.sqlite.hs.jinja
+  templates/package.cabal.jinja
+  templates/query.hs.jinja
+  templates/toplevel.hs.jinja
+
+common stuff
+  ghc-options:        -Wall -Wno-name-shadowing
+  build-depends:
+    , base
+    , sqlc-hs:sqlc-hs-prelude
+
+  mixins:
+    base hiding (Prelude),
+    sqlc-hs:sqlc-hs-prelude (Sqlc.Hs.Prelude as Prelude)
+
+  default-extensions:
+    DerivingStrategies
+    DuplicateRecordFields
+    OverloadedLabels
+    OverloadedRecordDot
+    OverloadedStrings
+
+library sqlc-hs-prelude
+  visibility:       private
+  exposed-modules:  Sqlc.Hs.Prelude
+  build-depends:
+    , base
+    , relude
+
+  hs-source-dirs:   sqlc-hs-prelude
+  default-language: GHC2021
+
+library
+  import:           stuff
+  exposed-modules:
+    Sqlc.Hs.Codegen
+    Sqlc.Hs.Config
+    Sqlc.Hs.Main
+    Sqlc.Hs.Resolve
+
+  other-modules:
+    Proto.Protos.Codegen
+    Proto.Protos.Codegen_Fields
+
+  build-depends:
+    , aeson
+    , bytestring
+    , directory
+    , ede
+    , file-embed
+    , filepath
+    , mtl
+    , proto-lens
+    , proto-lens-runtime
+    , text
+    , vector
+
+  hs-source-dirs:   src sqlc-hs-protos
+  default-language: GHC2021
+
+executable sqlc-hs
+  import:           stuff
+  main-is:          Main.hs
+
+  -- other-modules:
+  -- other-extensions:
+  build-depends:    sqlc-hs
+  hs-source-dirs:   app
+  default-language: GHC2021
+
+test-suite sqlc-hs-test
+  import:           stuff
+  default-language: GHC2021
+
+  -- other-modules:
+  -- other-extensions:
+  type:             exitcode-stdio-1.0
+  hs-source-dirs:   test
+  main-is:          Main.hs
+  build-depends:    sqlc-hs

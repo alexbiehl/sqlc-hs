@@ -1,0 +1,12 @@
+cabal-version: 3.0
+name: {{ packageName }}
+version: {{ packageVersion }}
+library
+  build-depends:
+  {% for dependency in buildDepends %}
+    {{ dependency.value }},
+  {% endfor %}
+  exposed-modules:
+  {% for module in exposedModules %}
+    {{ module.value }}
+  {% endfor %}

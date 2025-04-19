@@ -1,0 +1,7 @@
+packages: . example
+
+allow-newer:
+  proto-lens:base
+
+extra-packages:
+  proto-lens-protoc

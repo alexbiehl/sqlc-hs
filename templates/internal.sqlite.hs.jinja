@@ -1,0 +1,51 @@
+{-# LANGUAGE DataKinds #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE TypeFamilies #-}
+module {{ moduleName }} (
+    Query(..),
+    Params,
+    Result,
+
+    Connection,
+    ToRow,
+    FromRow,
+
+    exec,
+    queryOne,
+    queryMany
+  ) where
+
+import Database.SQLite.Simple (Connection, FromRow, ToRow)
+import qualified Database.SQLite.Simple
+import GHC.TypeLits (Symbol)
+
+newtype Query (name :: Symbol) (command :: Symbol)
+  = Query Database.SQLite.Simple.Query
+
+data family Params (name :: Symbol)
+
+data family Result (name :: Symbol)
+
+exec :: Connection -> Query name ":exec" -> Params name -> IO ()
+exec = undefined
+
+queryOne ::
+  (ToRow (Params name), FromRow (Result name)) =>
+  Connection ->
+  Query name ":one" ->
+  Params name ->
+  IO (Maybe (Result name))
+queryOne connection (Query sql) params = do
+  result <- Database.SQLite.Simple.query connection sql params
+  case result of
+    [] -> pure Nothing
+    x : _ -> pure (Just x)
+
+queryMany ::
+  (ToRow (Params name), FromRow (Result name)) =>
+  Connection ->
+  Query name ":many" ->
+  Params name ->
+  IO [Result name]
+queryMany connection (Query sql) =
+  Database.SQLite.Simple.query connection sql

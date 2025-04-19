@@ -1,0 +1,40 @@
+{- This file was auto-generated from {{sourceFile}} by sqlc-hs. -}
+{-# LANGUAGE DataKinds #-}
+{-# LANGUAGE DeriveAnyClass #-}
+{-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE DerivingStrategies #-}
+{-# LANGUAGE DuplicateRecordFields #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE TypeFamilies #-}
+
+module {{moduleName}} where
+
+import {{ internalModuleName }} (Query(..), Params, Result, ToRow, FromRow)
+import GHC.Generics (Generic)
+
+{% for import in moduleImports  %}
+import qualified {{ import.value }}
+{% endfor %}
+
+{{ haskellQueryName }} :: Query {{ escapedQueryName }} {{ escapedCommand }}
+{{ haskellQueryName }} = Query {{ escapedSql }}
+
+data instance Params {{ escapedQueryName }} = {{ haskellParamsName }}
+  {
+  {% for param in parameterColumns %}
+    {{ param.value.name }} :: {{ param.value.type }}{% if !param.last %},{% endif %}
+  {% endfor %}
+  }
+  deriving stock (Generic)
+  deriving anyclass (ToRow)
+
+{% if command != ":exec" %}
+data instance Result {{ escapedQueryName }} = {{ haskellResultName }}
+  {
+  {% for column in resultColumns  %}
+    {{ column.value.name }} :: !{{ column.value.type }}{% if !column.last %},{% endif %}
+  {% endfor %}
+  }
+  deriving stock (Generic)
+  deriving anyclass (FromRow)
+{% endif %}

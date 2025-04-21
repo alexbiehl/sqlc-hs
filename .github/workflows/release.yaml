@@ -1,0 +1,50 @@
+name: Haskell CI
+
+on:
+  push:
+    tags:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Build
+      run: |
+        curl https://gitlab.haskell.org/haskell-wasm/ghc-wasm-meta/-/raw/master/bootstrap.sh | sh
+        source ~/.ghc-wasm/env
+
+        rm cabal.project.freeze
+        wasm32-wasi-cabal update hackage.haskell.org,2025-03-30T20:28:13Z
+        wasm32-wasi-cabal build --allow-newer exe:sqlc-hs
+        cp $(wasm32-wasi-cabal list-bin --allow-newer exe:sqlc-hs) "./sqlc-hs-${{ github.ref_name }}.wasm"
+
+    - name: Release notes
+      run: |
+        SHA256=$(sha256sum "./sqlc-hs-${{ github.ref_name }}.wasm" | awk '{ print $1 }')
+        cat <<EOF > ${{ github.workspace }}-CHANGELOG.txt
+        # Configuration
+
+        \`\`\`yaml
+          version: '2'
+          plugins:
+            - name: haskell
+              wasm:
+                url: https://github.com/alexbiehl/sqlc-hs/releases/download/${{ github.ref_name }}/sqlc-hs-${{ github.ref_name }}.wasm
+                sha256: $SHA256
+        \`\`\`
+        EOF
+
+    - name: Publish
+      uses: softprops/action-gh-release@v2
+      with:
+        body_path: ${{ github.workspace }}-CHANGELOG.txt
+        files: sqlc-hs-${{ github.ref_name }}.wasm

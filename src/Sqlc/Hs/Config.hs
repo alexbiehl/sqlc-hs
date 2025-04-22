@@ -108,23 +108,75 @@ defaultConfig =
       haskellModulePrefix = Just "Queries",
       overrides =
         [ fromList
-            [ override "bigserial" "base" "Data.Int" "Int64",
-              override "text" "text" "Data.Text" "Text",
-              override "smallint" "base" "Data.Int" "Int16",
-              override "integer" "base" "Data.Int" "Int32",
-              override "bigint" "base" "Data.Int" "Int64",
-              override "serial" "base" "Data.Int" "Int32",
-              override "bigserial" "base" "Data.Int" "Int64",
-              override "decimal" "base" "Prelude." "Double",
-              override "numeric" "base" "Prelude" "Double",
-              override "real" "base" "Prelude" "Float",
-              override "double precision" "base" "Prelude" "Double",
-              override "bytea" "bytestring" "Data.ByteString.Short" "ShortByteString"
+            [ pgType "serial" "base" "Data.Int" "Int32",
+              pgType "serial4" "base" "Data.Int" "Int32",
+              pgType "pg_catalog.serial4" "base" "Data.Int" "Int32",
+
+              pgType "bigserial" "base" "Data.Int" "Int64",
+              pgType "serial8" "base" "Data.Int" "Int64",
+              pgType "pg_catalog.serial8" "base" "Data.Int" "Int64",
+
+              pgType "smallserial" "base" "Data.Int" "Int16",
+              pgType "serial2" "base" "Data.Int" "Int16",
+              pgType "pg_catalog.serial2" "base" "Data.Int" "Int16",
+
+              pgType "integer" "base" "Data.Int" "Int32",
+              pgType "int" "base" "Data.Int" "Int32",
+              pgType "int4" "base" "Data.Int" "Int32",
+
+              pgType "bigint" "base" "Data.Int" "Int64",
+              pgType "int8" "base" "Data.Int" "Int64",
+              pgType "pg_catalog.int8" "base" "Data.Int" "Int64",
+
+              pgType "smallint" "base" "Data.Int" "Int16",
+              pgType "int2" "base" "Data.Int" "Int16",
+              pgType "pg_catalog.int2" "base" "Data.Int" "Int16",
+
+              pgType "float" "base" "GHC.Types" "Double",
+              pgType "double precision" "base" "GHC.Types" "Double",
+              pgType "float8" "base" "GHC.Types" "Double",
+              pgType "pg_catalog.float8" "base" "GHC.Types" "Double",
+
+              pgType "real" "base" "GHC.Types" "Float",
+              pgType "float4" "base" "GHC.Types" "Float",
+              pgType "pg_catalog.float4" "base" "GHC.Types" "Float",
+
+              pgType "numeric" "scientific" "Data.Scientific" "Scientific",
+              pgType "pg_catalog.numeric" "scientific" "Data.Scientific" "Scientific",
+              pgType "money" "scientific" "Data.Scientific" "Scientific",
+
+              pgType "boolean" "base" "GHC.Types" "Bool",
+              pgType "bool" "base" "GHC.Types" "Bool",
+              pgType "pg_catalog.bool" "base" "GHC.Types" "Bool",
+
+              pgType "json" "aeson" "Data.Aeson" "Value",
+              pgType "pg_catalog.json" "aeson" "Data.Aeson" "Value",
+
+              pgType "jsonb" "aeson" "Data.Aeson" "Value",
+              pgType "pg_catalog.jsonb" "aeson" "Data.Aeson" "Value",
+
+              pgType "bytea" "bytestring" "Data.ByteString.Short" "ShortByteString",
+              pgType "blob" "bytestring" "Data.ByteString.Short" "ShortByteString",
+              pgType "pg_catalog.bytea" "bytestring" "Data.ByteString.Short" "ShortByteString",
+
+              pgType "date" "time" "Data.Time" "Day",
+
+              pgType "pg_catalog.time" "time" "Data.Time" "UTCTime",
+              pgType "pg_catalog.timetz" "time" "Data.Time" "LocalTime",
+
+              pgType "text" "text" "Data.Text" "Text",
+              pgType "pg_catalog.varchar" "text" "Data.Text" "Text",
+              pgType "pg_catalog.bpchar" "text" "Data.Text" "Text",
+              pgType "string" "text" "Data.Text" "Text",
+              pgType "citext" "text" "Data.Text" "Text",
+              pgType "name" "text" "Data.Text" "Text",
+
+              pgType "uuid" "uuid" "Data.UUID" "UUID"
             ]
         ]
     }
   where
-    override databaseType package module' type_ =
+    pgType databaseType package module' type_ =
       Override
         { databaseType,
           haskellType =

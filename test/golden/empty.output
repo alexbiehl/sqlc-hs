@@ -5,6 +5,7 @@ name: queries
 version: 0.1.0.0
 library
   build-depends:
+    base,
     postgresql-simple,
     vector,
   exposed-modules:

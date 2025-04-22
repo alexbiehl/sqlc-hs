@@ -127,7 +127,9 @@ codegenInternal engine internal = do
     Module
       { name = internal.toHaskellModuleName,
         fileName = internal.toHaskellFileName,
-        importedTypes = dependencies,
+        importedTypes =
+          [HaskellType {package = Just "base", module' = Nothing, name = Nothing}]
+            <> dependencies,
         contents = contents context
       }
   where
@@ -135,21 +137,21 @@ codegenInternal engine internal = do
       case engine of
         "sqlite" ->
           ( internalSqliteTemplate,
-            [ HaskellType {package = "sqlite-simple", module' = "Database.SQLite.Simple", name = "ToRow"},
-              HaskellType {package = "sqlite-simple", module' = "Database.SQLite.Simple", name = "FromRow"}
+            [ HaskellType {package = Just "sqlite-simple", module' = Just "Database.SQLite.Simple", name = Just "ToRow"},
+              HaskellType {package = Just "sqlite-simple", module' = Just "Database.SQLite.Simple", name = Just "FromRow"}
             ]
           )
         "mysql" ->
           ( internalMysqlTemplate,
-            [ HaskellType {package = "mysql-simple", module' = "Database.MySQL.Simple", name = "ToRow"},
-              HaskellType {package = "mysql-simple", module' = "Database.MySQL.Simple", name = "FromRow"}
+            [ HaskellType {package = Just "mysql-simple", module' = Just "Database.MySQL.Simple", name = Just "ToRow"},
+              HaskellType {package = Just "mysql-simple", module' = Just "Database.MySQL.Simple", name = Just "FromRow"}
             ]
           )
         _ ->
           ( internalPostgresTemplate,
-            [ HaskellType {package = "postgresql-simple", module' = "Database.PostgreSQL.Simple", name = "ToRow"},
-              HaskellType {package = "postgresql-simple", module' = "Database.PostgreSQL.Simple", name = "FromRow"},
-              HaskellType {package = "vector", module' = "Data.Vector", name = "Vector"}
+            [ HaskellType {package = Just "postgresql-simple", module' = Just "Database.PostgreSQL.Simple", name = Just "ToRow"},
+              HaskellType {package = Just "postgresql-simple", module' = Just "Database.PostgreSQL.Simple", name = Just "FromRow"},
+              HaskellType {package = Just "vector", module' = Just "Data.Vector", name = Just "Vector"}
             ]
           )
 
@@ -194,7 +196,7 @@ codegenCabalFile config generatedModules
     buildDepends =
       sort $
         ordNub $
-          map
+          mapMaybe
             (.package)
             (concatMap (.importedTypes) generatedModules)
 
@@ -230,13 +232,14 @@ codegenQuery internalModule resolveName resolveType query = do
 
   let importedTypes :: [HaskellType]
       importedTypes =
-        fmap snd (toList parameterColumns) <> fmap snd (toList resultColumns)
+        concatMap (toList . snd) (toList parameterColumns)
+          <> concatMap (toList . snd) (toList resultColumns)
 
       -- Modules that the query module needs to import.
       imports :: [Text]
       imports =
         ordNub $
-          fmap (.module') importedTypes
+          mapMaybe (.module') importedTypes
 
       context =
         Text.EDE.fromPairs
@@ -270,13 +273,13 @@ codegenQuery internalModule resolveName resolveType query = do
         Text.EDE.Failure errorDoc ->
           error (show errorDoc)
 
-    toParameterColumn (column, haskellType) =
+    toParameterColumn (column, haskellType :| _) =
       Text.EDE.fromPairs
         [ "name" Text.EDE..= (resolveName (column ^. #name)).toFieldName,
           "type" Text.EDE..= encodeColumnType haskellType
         ]
 
-    toResultColumn (column, haskellType) =
+    toResultColumn (column, haskellType :| _) =
       Text.EDE.fromPairs
         [ "name" Text.EDE..= (resolveName (column ^. #name)).toFieldName,
           "type" Text.EDE..= encodeColumnType haskellType

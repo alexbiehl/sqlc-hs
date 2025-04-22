@@ -12,6 +12,7 @@ module Sqlc.Hs.Resolve
 where
 
 import Data.Char qualified
+import Data.List qualified
 import Data.ProtoLens.Labels ()
 import Data.Text qualified
 import Data.Vector (Vector)
@@ -128,9 +129,16 @@ resolveQueryName haskellModulePrefix name =
           | otherwise ->
               name
 
--- | Resolves a possibly fully qualified type to a suitable Haskell type. It may return multiple 'HaskellType'
--- where the very first is the type to use in the generated code.
-type ResolveType = Proto.Protos.Codegen.Column -> Maybe (Proto.Protos.Codegen.Column, HaskellType)
+-- | Resolves a possibly fully qualified type to a suitable Haskell type.
+--
+-- 'ResolveType' may wrap the underlying type into a 'Vector' or 'Maybe', or others depending on whether
+-- the column nullable or an array. In this case it might return multiple HaskellTypes of the form
+--
+--   [ Maybe (Vector Text), base:Data.Maybe.Maybe, vector:Data.Vector.Vector ]
+--
+-- The first type is the one you want use for code generation while the rest is only info for dependency
+-- and import management.
+type ResolveType = Proto.Protos.Codegen.Column -> Maybe (Proto.Protos.Codegen.Column, NonEmpty HaskellType)
 
 newtype Overrides a = Overrides [Vector a]
   deriving stock (Functor, Foldable, Traversable)
@@ -141,34 +149,98 @@ newResolveType ::
   Text ->
   ResolveType
 newResolveType config engine = \column ->
-  case find (matches column) (Overrides overrides) of
-    Just override ->
-      Just (column, override.haskellType)
-    Nothing ->
+  case mapMaybe (\matcher -> matcher.matcher column) matchers of
+    haskellTypes : _ ->
+      Just (column, haskellTypes)
+    _ ->
       Nothing
   where
-    -- We only want to search through engine specific or
-    -- generic overrides.
-    overrides =
-      config.overrides <&> \overrides -> do
-        override <- overrides
-        guard $
+    matchers :: [Matcher]
+    matchers =
+      [ matcher
+        | matcher <-
+            concat
+              [ map overrideToMatcher (toList (Overrides config.overrides)),
+                builtins
+              ],
+          -- In case the GenerateRequest didn't specify an engine.
           engine == mempty
-            || isNothing override.engine
-            || override.engine == Just engine
-        pure override
+            -- In case the matcher is engine generic
+            || isNothing matcher.engine
+            -- In case matcher engine and requested engine match
+            || matcher.engine == Just engine
+      ]
 
+columnDataType :: Proto.Protos.Codegen.Identifier -> Text
+columnDataType identifier
+  | (identifier ^. #schema) /= mempty =
+      (identifier ^. #schema) <> "." <> (identifier ^. #name)
+  | otherwise =
+      identifier ^. #name
+
+overrideToMatcher :: Override -> Matcher
+overrideToMatcher override =
+  Matcher
+    { engine = override.engine,
+      matcher
+    }
+  where
     -- TODO extend the matching to support overriding individual columns
-    matches :: Proto.Protos.Codegen.Column -> Override -> Bool
-    matches column typeMapping
-      | dataType (column ^. #type') == typeMapping.databaseType =
-          True
+    matcher column
+      | columnDataType (column ^. #type') == override.databaseType =
+          Just (pure override.haskellType)
       | otherwise =
-          False
+          Nothing
 
-    dataType :: Proto.Protos.Codegen.Identifier -> Text
-    dataType identifier
-      | (identifier ^. #schema) /= mempty =
-          (identifier ^. #schema) <> "." <> (identifier ^. #name)
+builtins :: [Matcher]
+builtins =
+  [ Matcher {engine = Just "postgresql", matcher = postgresBuiltin},
+    Matcher {engine = Just "mysql", matcher = mysqlBuiltin}
+  ]
+
+data Matcher = Matcher
+  { engine :: Maybe Text,
+    matcher :: Proto.Protos.Codegen.Column -> Maybe (NonEmpty HaskellType)
+  }
+
+mysqlBuiltin :: Proto.Protos.Codegen.Column -> Maybe (NonEmpty HaskellType)
+mysqlBuiltin _column = Nothing
+
+postgresBuiltin :: Proto.Protos.Codegen.Column -> Maybe (NonEmpty HaskellType)
+postgresBuiltin column =
+  asum
+    [ pgType ["serial", "serial4", "pg_catalog.serial4"] "base" "Data.Int.Int32",
+      pgType ["bigserial", "serial8", "pg_catalog.serial8"] "base" "Data.Int.Int64",
+      pgType ["smallserial", "serial2", "pg_catalog.serial2"] "base" "Data.Int.Int16",
+      pgType ["integer", "int", "int4", "pg_catalog.int4"] "base" "Data.Int.Int32",
+      pgType ["bigint", "int8", "pg_catalog.int8"] "base" "Data.Int.Int64",
+      pgType ["smallint", "int2", "pg_catalog.int2"] "base" "Data.Int.Int16",
+      pgType ["float", "double precision", "float8", "pg_catalog.float8"] "base" "GHC.Types.Double",
+      pgType ["real", "float4", "pg_catalog.float4"] "base" "GHC.Types.Float",
+      pgType ["numeric", "pg_catalog.numeric", "money"] "scientific" "Data.Scientific.Scientific",
+      pgType ["boolean", "bool", "pg_catalog.bool"] "base" "GHC.Types.Bool",
+      pgType ["json", "pg_catalog.json"] "aeson" "Data.Aeson.Value",
+      pgType ["jsonb", "pg_catalog.jsonb"] "aeson" "Data.Aeson.Value",
+      pgType ["bytea", "blob", "pg_catalog.bytea"] "bytestring" "Data.ByteString.Short.ShortByteString",
+      pgType ["text", "pg_catalog.varchar", "pg_catalog.bpchar", "string", "citext", "name"] "text" "Data.Text.Text"
+    ]
+  where
+    columnType :: Text
+    columnType =
+      columnDataType (column ^. #type')
+
+    pgType pgTypes package qualifiedType
+      | columnType `elem` pgTypes =
+          pure $
+            pure
+              HaskellType
+                { package =
+                    Just package,
+                  module' =
+                    Just
+                      (Data.Text.intercalate "." (Data.List.init (Data.Text.splitOn "." qualifiedType))),
+                  name =
+                    Just qualifiedType
+                }
       | otherwise =
-          identifier ^. #name
+          Nothing

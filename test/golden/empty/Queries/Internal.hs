@@ -1,19 +1,19 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE TypeFamilies #-}
-module Queries.Internal (
-    Query(..),
+
+module Queries.Internal
+  ( Query (..),
     Params,
     Result,
-
     Connection,
     ToRow,
     FromRow,
-
     exec,
     queryOne,
-    queryMany
-  ) where
+    queryMany,
+  )
+where
 
 import Data.Vector (Vector)
 import Database.PostgreSQL.Simple (Connection, FromRow, ToRow)

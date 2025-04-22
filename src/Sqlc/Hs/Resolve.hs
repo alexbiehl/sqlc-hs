@@ -42,7 +42,8 @@ data ResolvedNames = ResolvedNames
     toParamsConstructorDeclarationName :: Text,
     toResultConstructorDeclarationName :: Text,
     toHaskellFileName :: Text,
-    toHaskellModuleName :: Text
+    toHaskellModuleName :: Text,
+    toFieldName :: Text
   }
 
 type ResolveName = Text -> ResolvedNames
@@ -64,11 +65,12 @@ resolveQueryName haskellModulePrefix name =
         --
         -- We could some more sophisticated things to make the query name a valid haskell function
         -- declaration identifier.
-        "query_" <> name,
+        "query_" <> sanitizedName,
       toParamsConstructorDeclarationName =
-        "Params_" <> name,
+        "Params_" <> sanitizedName,
       toResultConstructorDeclarationName =
-        "Result_" <> name,
+        "Result_" <> sanitizedName,
+      toFieldName,
       toHaskellFileName =
         applyHaskellModulePrefix (toText ((toString nameToHaskellModuleName <.> "hs"))),
       toHaskellModuleName =
@@ -80,7 +82,7 @@ resolveQueryName haskellModulePrefix name =
     }
   where
     nameToHaskellModuleName =
-      case Data.Text.uncons name of
+      case Data.Text.uncons sanitizedName of
         Just (c, name) ->
           Data.Char.toUpper c `Data.Text.cons` name
         Nothing ->
@@ -94,6 +96,37 @@ resolveQueryName haskellModulePrefix name =
               toString (Data.Text.replace "." "/" prefix) </> (toString suffix)
         Nothing ->
           identity
+
+    -- A version of the name suitable for consumption as a Haskell identifier.
+    sanitizedName :: Text
+    sanitizedName =
+      Data.Text.map
+        ( \c ->
+            case c of
+              c
+                | Data.Char.isLetter c ->
+                    c
+                | Data.Char.isDigit c ->
+                    c
+                | otherwise ->
+                    '_'
+        )
+        name
+
+    toFieldName :: Text
+    toFieldName =
+      case name of
+        name
+          | Just (c, _rest) <- Data.Text.uncons name,
+            Data.Char.isDigit c ->
+              -- Prepend _ if the first letter is a digit
+              "_" <> name
+          | Just (c, rest) <- Data.Text.uncons name,
+            Data.Char.isUpper c ->
+              -- Ensure first letter is lower cased
+              Data.Char.toLower c `Data.Text.cons` rest
+          | otherwise ->
+              name
 
 -- | Resolves a possibly fully qualified type to a suitable Haskell type. It may return multiple 'HaskellType'
 -- where the very first is the type to use in the generated code.

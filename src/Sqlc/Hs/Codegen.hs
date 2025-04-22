@@ -272,13 +272,13 @@ codegenQuery internalModule resolveName resolveType query = do
 
     toParameterColumn (column, haskellType) =
       Text.EDE.fromPairs
-        [ "name" Text.EDE..= (column ^. #name),
+        [ "name" Text.EDE..= (resolveName (column ^. #name)).toFieldName,
           "type" Text.EDE..= encodeColumnType haskellType
         ]
 
     toResultColumn (column, haskellType) =
       Text.EDE.fromPairs
-        [ "name" Text.EDE..= (column ^. #name),
+        [ "name" Text.EDE..= (resolveName (column ^. #name)).toFieldName,
           "type" Text.EDE..= encodeColumnType haskellType
         ]
 

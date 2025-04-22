@@ -120,7 +120,8 @@ newResolveType config engine = \column ->
       config.overrides <&> \overrides -> do
         override <- overrides
         guard $
-          isNothing override.engine
+          engine == mempty
+            || isNothing override.engine
             || override.engine == Just engine
         pure override
 

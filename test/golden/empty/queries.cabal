@@ -1,0 +1,10 @@
+cabal-version: 3.0
+name: queries
+version: 0.1.0.0
+library
+  build-depends:
+    postgresql-simple,
+    vector,
+  exposed-modules:
+    Queries
+    Queries.Internal

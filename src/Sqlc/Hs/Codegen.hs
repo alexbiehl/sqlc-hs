@@ -19,6 +19,8 @@ import Sqlc.Hs.Resolve
     newResolveType,
     resolveQueryName,
   )
+import System.Exit qualified
+import System.IO qualified
 import Text.EDE qualified
 
 -- | 'File' represents a logical file in the file in the files
@@ -219,12 +221,12 @@ codegenQuery internalModule resolveName resolveType query = do
   parameterColumns <-
     forM (query ^. #params) $ \parameter -> do
       whenNothing (resolveType (parameter ^. #column)) $
-        error "TODO"
+        couldNotResolveType (parameter ^. #column)
 
   resultColumns <-
     forM (query ^. #columns) $ \column -> do
       whenNothing (resolveType column) $
-        error "TODO"
+        couldNotResolveType column
 
   let importedTypes :: [HaskellType]
       importedTypes =
@@ -282,6 +284,14 @@ codegenQuery internalModule resolveName resolveType query = do
 
     encodeColumnType haskellType =
       haskellType.name
+
+    couldNotResolveType column = do
+      System.IO.hPutStrLn System.IO.stderr $
+        "Could not resolve type "
+          <> show (column ^. #type')
+          <> " for column "
+          <> show (column ^. #name)
+      System.Exit.exitWith (System.Exit.ExitFailure 1)
 
 toplevelTemplate :: Text.EDE.Template
 toplevelTemplate =

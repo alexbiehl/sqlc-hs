@@ -1,0 +1,20 @@
+queries {
+  text: "SELECT * FROM users;"
+  name: "ListUsers"
+  cmd: "SELECT"
+  filename: "query/users.sql"
+  columns {
+    name: "id"
+    not_null: true
+    type {
+      name: "serial"
+    }
+  }
+  columns {
+    name: "name"
+    not_null: true
+    type {
+      name: "text"
+    }
+  }
+}

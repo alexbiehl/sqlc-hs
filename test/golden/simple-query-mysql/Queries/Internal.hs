@@ -11,19 +11,19 @@ module Queries.Internal (
     queryMany,
 
     -- * Reexports
-    Database.PostgreSQL.Simple.Connection,
-    Database.PostgreSQL.Simple.ToRow,
-    Database.PostgreSQL.Simple.FromRow,
+    Database.MySQL.Simple.Connection,
+    Database.MySQL.Simple.QueryParams.QueryParams,
+    Database.MySQL.Simple.QueryResults.QueryResults,
   ) where
 
-import Data.Vector (Vector)
-import Database.PostgreSQL.Simple (Connection, FromRow, ToRow)
-import qualified Database.PostgreSQL.Simple
-import qualified Database.PostgreSQL.Simple.Vector
+import Database.MySQL.Simple (Connection)
+import qualified Database.MySQL.Simple
+import qualified Database.MySQL.Simple.QueryParams
+import qualified Database.MySQL.Simple.QueryResults
 import GHC.TypeLits (Symbol)
 
 newtype Query (name :: Symbol) (command :: Symbol)
-  = Query Database.PostgreSQL.Simple.Query
+  = Query Database.MySQL.Simple.Query
 
 data family Params (name :: Symbol)
 
@@ -33,22 +33,26 @@ exec :: Connection -> Query name ":exec" -> Params name -> IO ()
 exec = undefined
 
 queryOne ::
-  (ToRow (Params name), FromRow (Result name)) =>
+  ( Database.MySQL.Simple.QueryParams.QueryParams (Params name),
+    Database.MySQL.Simple.QueryResults.QueryResults (Result name)
+  ) =>
   Connection ->
   Query name ":one" ->
   Params name ->
   IO (Maybe (Result name))
 queryOne connection (Query sql) params = do
-  result <- Database.PostgreSQL.Simple.query connection sql params
+  result <- Database.MySQL.Simple.query connection sql params
   case result of
     [] -> pure Nothing
     x : _ -> pure (Just x)
 
 queryMany ::
-  (ToRow (Params name), FromRow (Result name)) =>
+  ( Database.MySQL.Simple.QueryParams.QueryParams (Params name),
+    Database.MySQL.Simple.QueryResults.QueryResults (Result name)
+  ) =>
   Connection ->
   Query name ":many" ->
   Params name ->
-  IO (Vector (Result name))
+  IO [Result name]
 queryMany connection (Query sql) =
-  Database.PostgreSQL.Simple.Vector.query connection sql
+  Database.MySQL.Simple.query connection sql

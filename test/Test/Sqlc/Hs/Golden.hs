@@ -1,6 +1,5 @@
 module Test.Sqlc.Hs.Golden where
 
-import Control.Exception (throwIO)
 import Data.ByteString qualified
 import Data.ProtoLens qualified
 import Data.ProtoLens.Labels ()
@@ -40,7 +39,7 @@ test_golden = do
             Data.ByteString.hPut System.IO.stderr stderr
 
             unless (exitCode == ExitSuccess) $
-              throwIO exitCode
+              error "sqlc-hs failed with an non-zero exit-code"
 
             message <-
               case Data.ProtoLens.decodeMessage @Proto.Protos.Codegen.GenerateResponse stdout of

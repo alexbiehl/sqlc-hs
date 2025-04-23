@@ -46,7 +46,12 @@ codegen :: Config -> Proto.Protos.Codegen.GenerateRequest -> IO [File]
 codegen config generateRequest = do
   modules <-
     traverse
-      (codegenQuery internalName resolveName resolveType)
+      ( codegenQuery
+          (generateRequest ^. #settings . #engine)
+          internalName
+          resolveName
+          resolveType
+      )
       (toList (generateRequest ^. #queries))
 
   toplevelModule <-
@@ -210,13 +215,15 @@ codegenCabalFile config generatedModules
 -- | Generate a file for a single query. This returns the resolved 'HaskellType's so
 -- that we can generate the necessary build-depends for the cabal file.
 codegenQuery ::
+  -- | Engine, if defined
+  Text ->
   -- | ResolvedName of the internal module name
   ResolvedNames ->
   ResolveName ->
   ResolveType ->
   Proto.Protos.Codegen.Query ->
   IO Module
-codegenQuery internalModule resolveName resolveType query = do
+codegenQuery engine internalModule resolveName resolveType query = do
   let resolvedName =
         resolveName (query ^. #name)
 
@@ -243,7 +250,9 @@ codegenQuery internalModule resolveName resolveType query = do
 
       context =
         Text.EDE.fromPairs
-          [ "sourceFile" Text.EDE..= (query ^. #filename),
+          [ "generatePostgresql" Text.EDE..= (engine == "postgresql"),
+            "generateMysql" Text.EDE..= (engine == "mysql"),
+            "sourceFile" Text.EDE..= (query ^. #filename),
             "moduleName" Text.EDE..= resolvedName.toHaskellModuleName,
             "moduleImports" Text.EDE..= imports,
             "internalModuleName" Text.EDE..= internalModule.toHaskellModuleName,

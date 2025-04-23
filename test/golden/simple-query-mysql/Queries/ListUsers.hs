@@ -1,0 +1,48 @@
+{- This file was auto-generated from query/users.sql by sqlc-hs. -}
+{-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE DataKinds #-}
+{-# LANGUAGE DeriveAnyClass #-}
+{-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE DerivingStrategies #-}
+{-# LANGUAGE DuplicateRecordFields #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE StandaloneDeriving #-}
+{-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE TypeFamilies #-}
+module Queries.ListUsers where
+
+import Queries.Internal (Query(..), Params, Result)
+import GHC.Generics (Generic)
+import qualified Database.MySQL.Simple.QueryParams
+import qualified Database.MySQL.Simple.QueryResults
+import qualified Database.MySQL.Simple.Result
+
+import qualified Data.Int
+import qualified Data.Text
+
+query_ListUsers :: Query "ListUsers" "SELECT"
+query_ListUsers = Query "SELECT * FROM users;"
+
+data instance Params "ListUsers" = Params_ListUsers
+  {
+  }
+
+data instance Result "ListUsers" = Result_ListUsers
+  {
+    id :: !Data.Int.Int32,
+    name :: !Data.Text.Text
+  }
+
+
+instance Database.MySQL.Simple.QueryParams.QueryParams (Params "ListUsers") where
+  renderParams Params_ListUsers{} =
+    [     ]
+
+instance Database.MySQL.Simple.QueryResults.QueryResults (Result "ListUsers") where
+  convertResults [a_1, a_2] [b_1, b_2] = Result_ListUsers{..}
+    where
+      !id = Database.MySQL.Simple.Result.convert a_1 b_1
+      !name = Database.MySQL.Simple.Result.convert a_2 b_2
+  convertResults a b =
+    Database.MySQL.Simple.QueryResults.convertError a b 2

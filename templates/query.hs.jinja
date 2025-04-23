@@ -1,16 +1,27 @@
 {- This file was auto-generated from {{sourceFile}} by sqlc-hs. -}
+{-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE DuplicateRecordFields #-}
+{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE StandaloneDeriving #-}
+{-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TypeFamilies #-}
-
 module {{moduleName}} where
 
-import {{ internalModuleName }} (Query(..), Params, Result, ToRow, FromRow)
+import {{ internalModuleName }} (Query(..), Params, Result)
 import GHC.Generics (Generic)
+{% if generatePostgresql %}
+import qualified Database.PostgreSQL.Simple
+{% endif %}
+{% if generateMysql %}
+import qualified Database.MySQL.Simple.QueryParams
+import qualified Database.MySQL.Simple.QueryResults
+import qualified Database.MySQL.Simple.Result
+{% endif %}
 
 {% for import in moduleImports  %}
 import qualified {{ import.value }}
@@ -25,8 +36,6 @@ data instance Params {{ escapedQueryName }} = {{ haskellParamsName }}
     {{ param.value.name }} :: {{ param.value.type }}{% if !param.last %},{% endif %}
   {% endfor %}
   }
-  deriving stock (Generic)
-  deriving anyclass (ToRow)
 
 {% if command != ":exec" %}
 data instance Result {{ escapedQueryName }} = {{ haskellResultName }}
@@ -35,6 +44,30 @@ data instance Result {{ escapedQueryName }} = {{ haskellResultName }}
     {{ column.value.name }} :: !{{ column.value.type }}{% if !column.last %},{% endif %}
   {% endfor %}
   }
-  deriving stock (Generic)
-  deriving anyclass (FromRow)
+{% endif %}
+
+{% if generatePostgresql %}
+deriving stock instance Generic (Params {{ escapedQueryName }})
+deriving anyclass instance Database.PostgreSQL.Simple.ToRow (Params {{ escapedQueryName }})
+
+deriving stock instance Generic (Result {{ escapedQueryName }})
+deriving anyclass instance Database.PostgreSQL.Simple.FromRow (Result {{ escapedQueryName }})
+{% endif %}
+
+{% if generateMysql %}
+instance Database.MySQL.Simple.QueryParams.QueryParams (Params {{ escapedQueryName }}) where
+  renderParams {{ haskellParamsName }}{% if parameterColumns | empty %}{}{% else %}{..}{% endif%} =
+    [ {% for param in parameterColumns %}
+      Database.MySQL.Simple.QueryParams.render {{ param.value.name }}{% if !column.last %}, {% endif %}
+      {% endfor %}
+    ]
+
+instance Database.MySQL.Simple.QueryResults.QueryResults (Result {{ escapedQueryName }}) where
+  convertResults [{% for column in resultColumns %}a_{{ column.index }}{% if !column.last %}, {% endif %}{% endfor%}] [{% for column in resultColumns %}b_{{ column.index }}{% if !column.last %}, {% endif %}{% endfor%}] = {{ haskellResultName }}{% if resultColumns | empty %}{}{% else %}{..}{% endif%}
+    where
+      {% for column in resultColumns %}
+      !{{ column.value.name }} = Database.MySQL.Simple.Result.convert a_{{ column.index }} b_{{ column.index }}
+      {% endfor %}
+  convertResults a b =
+    Database.MySQL.Simple.QueryResults.convertError a b {{ resultColumns | length }}
 {% endif %}

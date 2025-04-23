@@ -1,3 +1,7 @@
+settings {
+  engine: "postgresql"
+}
+
 queries {
   text: "SELECT * FROM users;"
   name: "ListUsers"
@@ -7,7 +11,7 @@ queries {
     name: "id"
     not_null: true
     type {
-      name: "serial"
+      name: "int"
     }
   }
   columns {
@@ -18,3 +22,5 @@ queries {
     }
   }
 }
+
+global_options: "{ \"cabal_package_name\": \"simple-query-postgresql\" }"

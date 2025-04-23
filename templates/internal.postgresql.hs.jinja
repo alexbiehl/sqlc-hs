@@ -6,13 +6,14 @@ module {{ moduleName }} (
     Params,
     Result,
 
-    Connection,
-    ToRow,
-    FromRow,
-
     exec,
     queryOne,
-    queryMany
+    queryMany,
+
+    -- * Reexports
+    Database.PostgreSQL.Simple.Connection,
+    Database.PostgreSQL.Simple.ToRow,
+    Database.PostgreSQL.Simple.FromRow,
   ) where
 
 import Data.Vector (Vector)

@@ -1,4 +1,10 @@
-packages: . example
+packages: .
+
+-- For easier testing of the generated code we include
+-- a few test cases here.
+optional-packages:
+  test/golden/simple-query-mysql,
+  test/golden/simple-query-postgresql
 
 allow-newer:
   proto-lens:base

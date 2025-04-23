@@ -101,6 +101,7 @@ Queries/ListUsers.hs
 module Queries.ListUsers where
 
 import Queries.Internal (Query(..), Params, Result)
+import qualified Database.MySQL.Simple.Param
 import qualified Database.MySQL.Simple.QueryParams
 import qualified Database.MySQL.Simple.QueryResults
 import qualified Database.MySQL.Simple.Result
@@ -109,10 +110,11 @@ import qualified Data.Int
 import qualified Data.Text
 
 query_ListUsers :: Query "ListUsers" "SELECT"
-query_ListUsers = Query "SELECT * FROM users;"
+query_ListUsers = Query "SELECT * FROM users WHERE $1 > 42;"
 
 data instance Params "ListUsers" = Params_ListUsers
   {
+    age :: Data.Int.Int32
   }
 
 data instance Result "ListUsers" = Result_ListUsers
@@ -123,8 +125,10 @@ data instance Result "ListUsers" = Result_ListUsers
 
 
 instance Database.MySQL.Simple.QueryParams.QueryParams (Params "ListUsers") where
-  renderParams Params_ListUsers{} =
-    [     ]
+  renderParams Params_ListUsers{..} =
+    [ 
+      Database.MySQL.Simple.Param.render age
+    ]
 
 instance Database.MySQL.Simple.QueryResults.QueryResults (Result "ListUsers") where
   convertResults [a_1, a_2] [b_1, b_2] = Result_ListUsers{..}

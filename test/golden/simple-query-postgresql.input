@@ -3,7 +3,7 @@ settings {
 }
 
 queries {
-  text: "SELECT * FROM users;"
+  text: "SELECT * FROM users WHERE $1 > 42;"
   name: "ListUsers"
   cmd: "SELECT"
   filename: "query/users.sql"
@@ -19,6 +19,15 @@ queries {
     not_null: true
     type {
       name: "text"
+    }
+  }
+  params {
+    column {
+      name: "age"
+      not_null: true
+      type {
+        name: "int"
+      }
     }
   }
 }

@@ -10,11 +10,12 @@ module {{moduleName}} where
 
 import {{ internalModuleName }} (Query(..), Params, Result)
 {% if generatePostgresql %}
-import qualified Database.PostgreSQL.Simple.ToRow
-import qualified Database.PostgreSQL.Simple.ToField
 import qualified Database.PostgreSQL.Simple.FromRow
+import qualified Database.PostgreSQL.Simple.ToField
+import qualified Database.PostgreSQL.Simple.ToRow
 {% endif %}
 {% if generateMysql %}
+import qualified Database.MySQL.Simple.Param
 import qualified Database.MySQL.Simple.QueryParams
 import qualified Database.MySQL.Simple.QueryResults
 import qualified Database.MySQL.Simple.Result
@@ -47,7 +48,7 @@ data instance Result {{ escapedQueryName }} = {{ haskellResultName }}
 instance Database.PostgreSQL.Simple.ToRow.ToRow (Params {{ escapedQueryName }}) where
   toRow {{ haskellParamsName }}{% if parameterColumns | empty %}{}{% else %}{..}{% endif%} =
     [ {% for param in parameterColumns %}
-      Database.PostgreSQL.Simple.ToField.toField {{ param.value.name }}{% if !column.last %}, {% endif %}
+      Database.PostgreSQL.Simple.ToField.toField {{ param.value.name }}{% if !param.last %}, {% endif %}
       {% endfor %}
     ]
 
@@ -63,16 +64,18 @@ instance Database.PostgreSQL.Simple.FromRow.FromRow (Result {{ escapedQueryName 
 instance Database.MySQL.Simple.QueryParams.QueryParams (Params {{ escapedQueryName }}) where
   renderParams {{ haskellParamsName }}{% if parameterColumns | empty %}{}{% else %}{..}{% endif%} =
     [ {% for param in parameterColumns %}
-      Database.MySQL.Simple.QueryParams.render {{ param.value.name }}{% if !column.last %}, {% endif %}
+      Database.MySQL.Simple.Param.render {{ param.value.name }}{% if !param.last %}, {% endif %}
       {% endfor %}
     ]
 
 instance Database.MySQL.Simple.QueryResults.QueryResults (Result {{ escapedQueryName }}) where
   convertResults [{% for column in resultColumns %}a_{{ column.index }}{% if !column.last %}, {% endif %}{% endfor%}] [{% for column in resultColumns %}b_{{ column.index }}{% if !column.last %}, {% endif %}{% endfor%}] = {{ haskellResultName }}{% if resultColumns | empty %}{}{% else %}{..}{% endif%}
+    {% if resultColumns %}
     where
       {% for column in resultColumns %}
       !{{ column.value.name }} = Database.MySQL.Simple.Result.convert a_{{ column.index }} b_{{ column.index }}
       {% endfor %}
+    {% endif %}
   convertResults a b =
     Database.MySQL.Simple.QueryResults.convertError a b {{ resultColumns | length }}
 {% endif %}

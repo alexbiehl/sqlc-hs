@@ -1,21 +1,18 @@
 {- This file was auto-generated from {{sourceFile}} by sqlc-hs. -}
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE DataKinds #-}
-{-# LANGUAGE DeriveAnyClass #-}
-{-# LANGUAGE DeriveGeneric #-}
-{-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE DuplicateRecordFields #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TypeFamilies #-}
 module {{moduleName}} where
 
 import {{ internalModuleName }} (Query(..), Params, Result)
-import GHC.Generics (Generic)
 {% if generatePostgresql %}
-import qualified Database.PostgreSQL.Simple
+import qualified Database.PostgreSQL.Simple.ToRow
+import qualified Database.PostgreSQL.Simple.ToField
+import qualified Database.PostgreSQL.Simple.FromRow
 {% endif %}
 {% if generateMysql %}
 import qualified Database.MySQL.Simple.QueryParams
@@ -47,11 +44,19 @@ data instance Result {{ escapedQueryName }} = {{ haskellResultName }}
 {% endif %}
 
 {% if generatePostgresql %}
-deriving stock instance Generic (Params {{ escapedQueryName }})
-deriving anyclass instance Database.PostgreSQL.Simple.ToRow (Params {{ escapedQueryName }})
+instance Database.PostgreSQL.Simple.ToRow.ToRow (Params {{ escapedQueryName }}) where
+  toRow {{ haskellParamsName }}{% if parameterColumns | empty %}{}{% else %}{..}{% endif%} =
+    [ {% for param in parameterColumns %}
+      Database.PostgreSQL.Simple.ToField.toField {{ param.value.name }}{% if !column.last %}, {% endif %}
+      {% endfor %}
+    ]
 
-deriving stock instance Generic (Result {{ escapedQueryName }})
-deriving anyclass instance Database.PostgreSQL.Simple.FromRow (Result {{ escapedQueryName }})
+instance Database.PostgreSQL.Simple.FromRow.FromRow (Result {{ escapedQueryName }}) where
+  fromRow =
+    {{ haskellResultName }}
+    {% for column in resultColumns %}
+      {% if column.first %}<$>{% else %}<*>{% endif%} Database.PostgreSQL.Simple.FromRow.field
+    {% endfor %}
 {% endif %}
 
 {% if generateMysql %}

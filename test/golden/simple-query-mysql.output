@@ -93,19 +93,14 @@ Queries/ListUsers.hs
 {- This file was auto-generated from query/users.sql by sqlc-hs. -}
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE DataKinds #-}
-{-# LANGUAGE DeriveAnyClass #-}
-{-# LANGUAGE DeriveGeneric #-}
-{-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE DuplicateRecordFields #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TypeFamilies #-}
 module Queries.ListUsers where
 
 import Queries.Internal (Query(..), Params, Result)
-import GHC.Generics (Generic)
 import qualified Database.MySQL.Simple.QueryParams
 import qualified Database.MySQL.Simple.QueryResults
 import qualified Database.MySQL.Simple.Result

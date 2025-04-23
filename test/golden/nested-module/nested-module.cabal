@@ -1,0 +1,10 @@
+cabal-version: 3.0
+name: nested-module
+version: 0.1.0.0
+library
+  build-depends:
+    base,
+    mysql-simple,
+  exposed-modules:
+    Foo.Bar
+    Foo.Bar.Internal

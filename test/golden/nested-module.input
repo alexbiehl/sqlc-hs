@@ -1,0 +1,5 @@
+settings {
+  engine: "mysql"
+}
+
+global_options: "{ \"cabal_package_name\": \"nested-module\", \"haskell_module_prefix\": \"Foo.Bar\" }"

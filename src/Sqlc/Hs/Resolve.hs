@@ -18,7 +18,7 @@ import Data.Text qualified
 import Data.Vector (Vector)
 import Proto.Protos.Codegen qualified
 import Sqlc.Hs.Config (Config (..), HaskellType (..), Override (..), defaultConfig)
-import System.FilePath ((<.>), (</>))
+import System.FilePath ((<.>))
 
 determineTopLevelModule ::
   -- | Haskell module prefix. E.g. "Data.Queries".
@@ -73,7 +73,8 @@ resolveQueryName haskellModulePrefix name =
         "Result_" <> sanitizedName,
       toFieldName,
       toHaskellFileName =
-        applyHaskellModulePrefix (toText ((toString nameToHaskellModuleName <.> "hs"))),
+        toText $
+          toString (haskellModuleToPath (applyHaskellModulePrefix nameToHaskellModuleName)) <.> "hs",
       toHaskellModuleName =
         case haskellModulePrefix of
           Just prefix ->
@@ -83,24 +84,38 @@ resolveQueryName haskellModulePrefix name =
     }
   where
     nameToHaskellModuleName =
-      case Data.Text.uncons sanitizedName of
+      case Data.Text.uncons sanitizedModuleName of
         Just (c, name) ->
           Data.Char.toUpper c `Data.Text.cons` name
         Nothing ->
           name
 
+    haskellModuleToPath :: Text -> Text
+    haskellModuleToPath =
+      Data.Text.intercalate "/" . Data.Text.splitOn "."
+
+    applyHaskellModulePrefix :: Text -> Text
     applyHaskellModulePrefix =
       case haskellModulePrefix of
         Just prefix ->
           \suffix ->
-            toText $
-              toString (Data.Text.replace "." "/" prefix) </> (toString suffix)
+            Data.Text.intercalate "." $
+              Data.Text.splitOn "." prefix <> Data.Text.splitOn "." suffix
         Nothing ->
           identity
 
     -- A version of the name suitable for consumption as a Haskell identifier.
     sanitizedName :: Text
-    sanitizedName =
+    sanitizedName = sanitizeHaskellIdentifier name
+
+    -- A version of the name suitable for use as a Haskell module name.
+    sanitizedModuleName :: Text
+    sanitizedModuleName =
+      Data.Text.intercalate "." $
+        map sanitizeHaskellIdentifier (Data.Text.splitOn "." name)
+
+    sanitizeHaskellIdentifier :: Text -> Text
+    sanitizeHaskellIdentifier =
       Data.Text.map
         ( \c ->
             case c of
@@ -112,7 +127,6 @@ resolveQueryName haskellModulePrefix name =
                 | otherwise ->
                     '_'
         )
-        name
 
     toFieldName :: Text
     toFieldName =

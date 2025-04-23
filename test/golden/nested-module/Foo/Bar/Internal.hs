@@ -1,0 +1,58 @@
+{-# LANGUAGE DataKinds #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE TypeFamilies #-}
+module Foo.Bar.Internal (
+    Query(..),
+    Params,
+    Result,
+
+    exec,
+    queryOne,
+    queryMany,
+
+    -- * Reexports
+    Database.MySQL.Simple.Connection,
+    Database.MySQL.Simple.QueryParams.QueryParams,
+    Database.MySQL.Simple.QueryResults.QueryResults,
+  ) where
+
+import Database.MySQL.Simple (Connection)
+import qualified Database.MySQL.Simple
+import qualified Database.MySQL.Simple.QueryParams
+import qualified Database.MySQL.Simple.QueryResults
+import GHC.TypeLits (Symbol)
+
+newtype Query (name :: Symbol) (command :: Symbol)
+  = Query Database.MySQL.Simple.Query
+
+data family Params (name :: Symbol)
+
+data family Result (name :: Symbol)
+
+exec :: Connection -> Query name ":exec" -> Params name -> IO ()
+exec = undefined
+
+queryOne ::
+  ( Database.MySQL.Simple.QueryParams.QueryParams (Params name),
+    Database.MySQL.Simple.QueryResults.QueryResults (Result name)
+  ) =>
+  Connection ->
+  Query name ":one" ->
+  Params name ->
+  IO (Maybe (Result name))
+queryOne connection (Query sql) params = do
+  result <- Database.MySQL.Simple.query connection sql params
+  case result of
+    [] -> pure Nothing
+    x : _ -> pure (Just x)
+
+queryMany ::
+  ( Database.MySQL.Simple.QueryParams.QueryParams (Params name),
+    Database.MySQL.Simple.QueryResults.QueryResults (Result name)
+  ) =>
+  Connection ->
+  Query name ":many" ->
+  Params name ->
+  IO [Result name]
+queryMany connection (Query sql) =
+  Database.MySQL.Simple.query connection sql

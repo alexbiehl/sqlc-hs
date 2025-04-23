@@ -116,18 +116,27 @@ resolveQueryName haskellModulePrefix name =
 
     toFieldName :: Text
     toFieldName =
-      case name of
-        name
-          | Just (c, _rest) <- Data.Text.uncons name,
-            Data.Char.isDigit c ->
-              -- Prepend _ if the first letter is a digit
-              "_" <> name
-          | Just (c, rest) <- Data.Text.uncons name,
-            Data.Char.isUpper c ->
-              -- Ensure first letter is lower cased
-              Data.Char.toLower c `Data.Text.cons` rest
-          | otherwise ->
-              name
+      escapeHaskellKeyword $
+        case name of
+          name
+            | Just (c, _rest) <- Data.Text.uncons name,
+              Data.Char.isDigit c ->
+                -- Prepend _ if the first letter is a digit
+                "_" <> name
+            | Just (c, rest) <- Data.Text.uncons name,
+              Data.Char.isUpper c ->
+                -- Ensure first letter is lower cased
+                Data.Char.toLower c `Data.Text.cons` rest
+            | otherwise ->
+                name
+
+    escapeHaskellKeyword x =
+      case x of
+        "type" -> "type'"
+        "module" -> "module'"
+        "case" -> "case'"
+        "of" -> "of'"
+        x -> x
 
 -- | Resolves a possibly fully qualified type to a suitable Haskell type.
 --
@@ -205,106 +214,109 @@ data Matcher = Matcher
 
 mysqlBuiltin :: Proto.Protos.Codegen.Column -> Maybe (NonEmpty HaskellType)
 mysqlBuiltin column =
-  asum
-    [ typ ["varchar", "text", "char", "tinytext", "mediumtext", "longtext"] "text" "Data.Text.Text",
-      do
-        guard $
-          columnType == "tinyint"
+  applyNullable column $
+    asum
+      [ typ ["varchar", "text", "char", "tinytext", "mediumtext", "longtext"] "text" "Data.Text.Text",
+        do
+          guard $
+            columnType == "tinyint"
 
-        if column ^. #length == 1
-          then
-            Just $
-              pure
-                HaskellType
-                  { package = Just "base",
-                    module' = Just "GHC.Types",
-                    name = Just "GHC.Types.Bool"
-                  }
-          else
-            if column ^. #unsigned
-              then
-                Just $
-                  pure
-                    HaskellType
-                      { package = Just "base",
-                        module' = Just "Data.Word",
-                        name = Just "Data.Word.Word8"
-                      }
-              else
-                Just $
-                  pure
-                    HaskellType
-                      { package = Just "base",
-                        module' = Just "Data.Int",
-                        name = Just "Data.Int.Int8"
-                      },
-      do
-        guard $
-          columnType == "smallint"
-        if column ^. #unsigned
-          then
-            Just $
-              pure
-                HaskellType
-                  { package = Just "base",
-                    module' = Just "Data.Word",
-                    name = Just "Data.Word.Word16"
-                  }
-          else
-            Just $
-              pure
-                HaskellType
-                  { package = Just "base",
-                    module' = Just "Data.Int",
-                    name = Just "Data.Int.Int16"
-                  },
-      do
-        guard $
-          columnType `elem` ["int", "integer", "mediumint"]
-        if column ^. #unsigned
-          then
-            Just $
-              pure
-                HaskellType
-                  { package = Just "base",
-                    module' = Just "Data.Word",
-                    name = Just "Data.Word.Word32"
-                  }
-          else
-            Just $
-              pure
-                HaskellType
-                  { package = Just "base",
-                    module' = Just "Data.Int",
-                    name = Just "Data.Int.Int32"
-                  },
-      do
-        guard $
-          columnType == "bigint"
-        if column ^. #unsigned
-          then
-            Just $
-              pure
-                HaskellType
-                  { package = Just "base",
-                    module' = Just "Data.Word",
-                    name = Just "Data.Word.Word64"
-                  }
-          else
-            Just $
-              pure
-                HaskellType
-                  { package = Just "base",
-                    module' = Just "Data.Int",
-                    name = Just "Data.Int.Int64"
-                  },
-      typ ["blob", "binary", "varbinary", "tinyblob", "mediumblob", "longblob"] "bytestring" "Data.ByteString.Short.ShortByteString",
-      typ ["double", "double precision", "real", "float"] "base" "GHC.Types.Double",
-      typ ["decimal", "dec", "fixed"] "scientific" "Data.Scientific.Scientific",
-      typ ["enum"] "text" "Data.Text.Text",
-      typ ["boolean", "bool"] "base" "GHC.Types.Bool",
-      typ ["json"] "aeson" "Data.Aeson.Value"
-    ]
+          if column ^. #length == 1
+            then
+              Just $
+                pure
+                  HaskellType
+                    { package = Just "ghc-prim",
+                      module' = Just "GHC.Types",
+                      name = Just "GHC.Types.Bool"
+                    }
+            else
+              if column ^. #unsigned
+                then
+                  Just $
+                    pure
+                      HaskellType
+                        { package = Just "base",
+                          module' = Just "Data.Word",
+                          name = Just "Data.Word.Word8"
+                        }
+                else
+                  Just $
+                    pure
+                      HaskellType
+                        { package = Just "base",
+                          module' = Just "Data.Int",
+                          name = Just "Data.Int.Int8"
+                        },
+        do
+          guard $
+            columnType == "smallint"
+          if column ^. #unsigned
+            then
+              Just $
+                pure
+                  HaskellType
+                    { package = Just "base",
+                      module' = Just "Data.Word",
+                      name = Just "Data.Word.Word16"
+                    }
+            else
+              Just $
+                pure
+                  HaskellType
+                    { package = Just "base",
+                      module' = Just "Data.Int",
+                      name = Just "Data.Int.Int16"
+                    },
+        do
+          guard $
+            columnType `elem` ["int", "integer", "mediumint"]
+          if column ^. #unsigned
+            then
+              Just $
+                pure
+                  HaskellType
+                    { package = Just "base",
+                      module' = Just "Data.Word",
+                      name = Just "Data.Word.Word32"
+                    }
+            else
+              Just $
+                pure
+                  HaskellType
+                    { package = Just "base",
+                      module' = Just "Data.Int",
+                      name = Just "Data.Int.Int32"
+                    },
+        do
+          guard $
+            columnType == "bigint"
+          if column ^. #unsigned
+            then
+              Just $
+                pure
+                  HaskellType
+                    { package = Just "base",
+                      module' = Just "Data.Word",
+                      name = Just "Data.Word.Word64"
+                    }
+            else
+              Just $
+                pure
+                  HaskellType
+                    { package = Just "base",
+                      module' = Just "Data.Int",
+                      name = Just "Data.Int.Int64"
+                    },
+        typ ["blob", "binary", "varbinary", "tinyblob", "mediumblob", "longblob"] "bytestring" "Data.ByteString.Short.ShortByteString",
+        typ ["double", "double precision", "real", "float"] "ghc-prim" "GHC.Types.Double",
+        typ ["decimal", "dec", "fixed"] "scientific" "Data.Scientific.Scientific",
+        typ ["enum"] "text" "Data.Text.Text",
+        typ ["boolean", "bool"] "ghc-prim" "GHC.Types.Bool",
+        typ ["json"] "aeson" "Data.Aeson.Value",
+        typ ["date"] "time" "Data.Time.Day",
+        typ ["timestamp", "datetime", "time"] "time" "Data.Time.UTCTime"
+      ]
   where
     columnType :: Text
     columnType =
@@ -326,24 +338,48 @@ mysqlBuiltin column =
       | otherwise =
           Nothing
 
+applyNullable :: Proto.Protos.Codegen.Column -> Maybe (NonEmpty HaskellType) -> Maybe (NonEmpty HaskellType)
+applyNullable column types
+  | not (column ^. #notNull) =
+      case types of
+        Just types ->
+          Just $
+            HaskellType
+              { package = Nothing,
+                module' = Nothing,
+                name = Just ("(GHC.Base.Maybe " <> fromMaybe "" (head types).name <> ")")
+              }
+              :| head types
+              : HaskellType
+                { package = Just "base",
+                  module' = Just "GHC.Base",
+                  name = Nothing
+                }
+              : tail types
+        Nothing ->
+          Nothing
+  | otherwise =
+      types
+
 postgresBuiltin :: Proto.Protos.Codegen.Column -> Maybe (NonEmpty HaskellType)
 postgresBuiltin column =
-  asum
-    [ pgType ["serial", "serial4", "pg_catalog.serial4"] "base" "Data.Int.Int32",
-      pgType ["bigserial", "serial8", "pg_catalog.serial8"] "base" "Data.Int.Int64",
-      pgType ["smallserial", "serial2", "pg_catalog.serial2"] "base" "Data.Int.Int16",
-      pgType ["integer", "int", "int4", "pg_catalog.int4"] "base" "Data.Int.Int32",
-      pgType ["bigint", "int8", "pg_catalog.int8"] "base" "Data.Int.Int64",
-      pgType ["smallint", "int2", "pg_catalog.int2"] "base" "Data.Int.Int16",
-      pgType ["float", "double precision", "float8", "pg_catalog.float8"] "base" "GHC.Types.Double",
-      pgType ["real", "float4", "pg_catalog.float4"] "base" "GHC.Types.Float",
-      pgType ["numeric", "pg_catalog.numeric", "money"] "scientific" "Data.Scientific.Scientific",
-      pgType ["boolean", "bool", "pg_catalog.bool"] "base" "GHC.Types.Bool",
-      pgType ["json", "pg_catalog.json"] "aeson" "Data.Aeson.Value",
-      pgType ["jsonb", "pg_catalog.jsonb"] "aeson" "Data.Aeson.Value",
-      pgType ["bytea", "blob", "pg_catalog.bytea"] "bytestring" "Data.ByteString.Short.ShortByteString",
-      pgType ["text", "pg_catalog.varchar", "pg_catalog.bpchar", "string", "citext", "name"] "text" "Data.Text.Text"
-    ]
+  applyNullable column $
+    asum
+      [ pgType ["serial", "serial4", "pg_catalog.serial4"] "base" "Data.Int.Int32",
+        pgType ["bigserial", "serial8", "pg_catalog.serial8"] "base" "Data.Int.Int64",
+        pgType ["smallserial", "serial2", "pg_catalog.serial2"] "base" "Data.Int.Int16",
+        pgType ["integer", "int", "int4", "pg_catalog.int4"] "base" "Data.Int.Int32",
+        pgType ["bigint", "int8", "pg_catalog.int8"] "base" "Data.Int.Int64",
+        pgType ["smallint", "int2", "pg_catalog.int2"] "base" "Data.Int.Int16",
+        pgType ["float", "double precision", "float8", "pg_catalog.float8"] "ghc-prim" "GHC.Types.Double",
+        pgType ["real", "float4", "pg_catalog.float4"] "ghc-prim" "GHC.Types.Float",
+        pgType ["numeric", "pg_catalog.numeric", "money"] "scientific" "Data.Scientific.Scientific",
+        pgType ["boolean", "bool", "pg_catalog.bool"] "ghc-prim" "GHC.Types.Bool",
+        pgType ["json", "pg_catalog.json"] "aeson" "Data.Aeson.Value",
+        pgType ["jsonb", "pg_catalog.jsonb"] "aeson" "Data.Aeson.Value",
+        pgType ["bytea", "blob", "pg_catalog.bytea"] "bytestring" "Data.ByteString.Short.ShortByteString",
+        pgType ["text", "pg_catalog.varchar", "pg_catalog.bpchar", "string", "citext", "name"] "text" "Data.Text.Text"
+      ]
   where
     columnType :: Text
     columnType =

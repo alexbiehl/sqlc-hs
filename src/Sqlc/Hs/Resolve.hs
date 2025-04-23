@@ -76,19 +76,11 @@ resolveQueryName haskellModulePrefix name =
         toText $
           toString (haskellModuleToPath (applyHaskellModulePrefix nameToHaskellModuleName)) <.> "hs",
       toHaskellModuleName =
-        case haskellModulePrefix of
-          Just prefix ->
-            prefix <> "." <> nameToHaskellModuleName
-          Nothing ->
-            nameToHaskellModuleName
+        applyHaskellModulePrefix nameToHaskellModuleName
     }
   where
     nameToHaskellModuleName =
-      case Data.Text.uncons sanitizedModuleName of
-        Just (c, name) ->
-          Data.Char.toUpper c `Data.Text.cons` name
-        Nothing ->
-          name
+      sanitizedModuleName
 
     haskellModuleToPath :: Text -> Text
     haskellModuleToPath =
@@ -112,7 +104,15 @@ resolveQueryName haskellModulePrefix name =
     sanitizedModuleName :: Text
     sanitizedModuleName =
       Data.Text.intercalate "." $
-        map sanitizeHaskellIdentifier (Data.Text.splitOn "." name)
+        map sanitizeModuleComponent (Data.Text.splitOn "." name)
+      where
+        sanitizeModuleComponent module' =
+          sanitizeHaskellIdentifier $
+            case Data.Text.uncons module' of
+              Just (c, rest) ->
+                Data.Char.toUpper c `Data.Text.cons` rest
+              Nothing ->
+                module'
 
     sanitizeHaskellIdentifier :: Text -> Text
     sanitizeHaskellIdentifier =

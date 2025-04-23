@@ -35,14 +35,12 @@ data instance Params {{ escapedQueryName }} = {{ haskellParamsName }}
   {% endfor %}
   }
 
-{% if command != ":exec" %}
 data instance Result {{ escapedQueryName }} = {{ haskellResultName }}
   {
   {% for column in resultColumns  %}
     {{ column.value.name }} :: !{{ column.value.type }}{% if !column.last %},{% endif %}
   {% endfor %}
   }
-{% endif %}
 
 {% if generatePostgresql %}
 instance Database.PostgreSQL.Simple.ToRow.ToRow (Params {{ escapedQueryName }}) where

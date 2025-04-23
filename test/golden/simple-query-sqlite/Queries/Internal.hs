@@ -1,7 +1,7 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE TypeFamilies #-}
-module {{ moduleName }} (
+module Queries.Internal (
     Query(..),
     Params,
     Result,

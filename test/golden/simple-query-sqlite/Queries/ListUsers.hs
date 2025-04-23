@@ -9,10 +9,9 @@
 module Queries.ListUsers where
 
 import Queries.Internal (Query(..), Params, Result)
-import qualified Database.MySQL.Simple.Param
-import qualified Database.MySQL.Simple.QueryParams
-import qualified Database.MySQL.Simple.QueryResults
-import qualified Database.MySQL.Simple.Result
+import qualified Database.SQLite.Simple.FromRow
+import qualified Database.SQLite.Simple.ToField
+import qualified Database.SQLite.Simple.ToRow
 
 import qualified Data.Int
 import qualified Data.Text
@@ -32,17 +31,15 @@ data instance Result "ListUsers" = Result_ListUsers
   }
 
 
-
-instance Database.MySQL.Simple.QueryParams.QueryParams (Params "ListUsers") where
-  renderParams Params_ListUsers{..} =
+instance Database.SQLite.Simple.ToRow.ToRow (Params "ListUsers") where
+  toRow Params_ListUsers{..} =
     [ 
-      Database.MySQL.Simple.Param.render age
+      Database.SQLite.Simple.ToField.toField age
     ]
 
-instance Database.MySQL.Simple.QueryResults.QueryResults (Result "ListUsers") where
-  convertResults [a_1, a_2] [b_1, b_2] = Result_ListUsers{..}
-    where
-      !id = Database.MySQL.Simple.Result.convert a_1 b_1
-      !name = Database.MySQL.Simple.Result.convert a_2 b_2
-  convertResults a b =
-    Database.MySQL.Simple.QueryResults.convertError a b 2
+instance Database.SQLite.Simple.FromRow.FromRow (Result "ListUsers") where
+  fromRow =
+    Result_ListUsers
+      <$> Database.SQLite.Simple.FromRow.field
+      <*> Database.SQLite.Simple.FromRow.field
+

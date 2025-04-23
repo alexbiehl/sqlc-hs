@@ -1,14 +1,13 @@
-simple-query-postgresql.cabal
+simple-query-sqlite.cabal
 
 cabal-version: 3.0
-name: simple-query-postgresql
+name: simple-query-sqlite
 version: 0.1.0.0
 library
   build-depends:
     base,
-    postgresql-simple,
+    sqlite-simple,
     text,
-    vector,
   exposed-modules:
     Queries
     Queries.Internal
@@ -42,19 +41,17 @@ module Queries.Internal (
     queryMany,
 
     -- * Reexports
-    Database.PostgreSQL.Simple.Connection,
-    Database.PostgreSQL.Simple.ToRow,
-    Database.PostgreSQL.Simple.FromRow,
+    Database.SQLite.Simple.Connection,
+    Database.SQLite.Simple.ToRow,
+    Database.SQLite.Simple.FromRow,
   ) where
 
-import Data.Vector (Vector)
-import Database.PostgreSQL.Simple (Connection, FromRow, ToRow)
-import qualified Database.PostgreSQL.Simple
-import qualified Database.PostgreSQL.Simple.Vector
+import Database.SQLite.Simple (Connection, FromRow, ToRow)
+import qualified Database.SQLite.Simple
 import GHC.TypeLits (Symbol)
 
 newtype Query (name :: Symbol) (command :: Symbol)
-  = Query Database.PostgreSQL.Simple.Query
+  = Query Database.SQLite.Simple.Query
 
 data family Params (name :: Symbol)
 
@@ -70,7 +67,7 @@ queryOne ::
   Params name ->
   IO (Maybe (Result name))
 queryOne connection (Query sql) params = do
-  result <- Database.PostgreSQL.Simple.query connection sql params
+  result <- Database.SQLite.Simple.query connection sql params
   case result of
     [] -> pure Nothing
     x : _ -> pure (Just x)
@@ -80,9 +77,9 @@ queryMany ::
   Connection ->
   Query name ":many" ->
   Params name ->
-  IO (Vector (Result name))
+  IO [Result name]
 queryMany connection (Query sql) =
-  Database.PostgreSQL.Simple.Vector.query connection sql
+  Database.SQLite.Simple.query connection sql
 
 
 Queries/ListUsers.hs
@@ -98,9 +95,9 @@ Queries/ListUsers.hs
 module Queries.ListUsers where
 
 import Queries.Internal (Query(..), Params, Result)
-import qualified Database.PostgreSQL.Simple.FromRow
-import qualified Database.PostgreSQL.Simple.ToField
-import qualified Database.PostgreSQL.Simple.ToRow
+import qualified Database.SQLite.Simple.FromRow
+import qualified Database.SQLite.Simple.ToField
+import qualified Database.SQLite.Simple.ToRow
 
 import qualified Data.Int
 import qualified Data.Text
@@ -119,18 +116,18 @@ data instance Result "ListUsers" = Result_ListUsers
     name :: !Data.Text.Text
   }
 
-instance Database.PostgreSQL.Simple.ToRow.ToRow (Params "ListUsers") where
+
+instance Database.SQLite.Simple.ToRow.ToRow (Params "ListUsers") where
   toRow Params_ListUsers{..} =
     [ 
-      Database.PostgreSQL.Simple.ToField.toField age
+      Database.SQLite.Simple.ToField.toField age
     ]
 
-instance Database.PostgreSQL.Simple.FromRow.FromRow (Result "ListUsers") where
+instance Database.SQLite.Simple.FromRow.FromRow (Result "ListUsers") where
   fromRow =
     Result_ListUsers
-      <$> Database.PostgreSQL.Simple.FromRow.field
-      <*> Database.PostgreSQL.Simple.FromRow.field
-
+      <$> Database.SQLite.Simple.FromRow.field
+      <*> Database.SQLite.Simple.FromRow.field
 
 
 

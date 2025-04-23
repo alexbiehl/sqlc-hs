@@ -251,6 +251,7 @@ codegenQuery engine internalModule resolveName resolveType query = do
       context =
         Text.EDE.fromPairs
           [ "generatePostgresql" Text.EDE..= (engine == "postgresql"),
+            "generateSqlite" Text.EDE..= (engine == "sqlite"),
             "generateMysql" Text.EDE..= (engine == "mysql"),
             "sourceFile" Text.EDE..= (query ^. #filename),
             "moduleName" Text.EDE..= resolvedName.toHaskellModuleName,

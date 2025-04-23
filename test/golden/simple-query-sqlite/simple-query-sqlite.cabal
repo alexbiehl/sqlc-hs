@@ -1,0 +1,12 @@
+cabal-version: 3.0
+name: simple-query-sqlite
+version: 0.1.0.0
+library
+  build-depends:
+    base,
+    sqlite-simple,
+    text,
+  exposed-modules:
+    Queries
+    Queries.Internal
+    Queries.ListUsers

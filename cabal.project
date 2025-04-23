@@ -5,6 +5,7 @@ packages: .
 optional-packages:
   test/golden/simple-query-mysql,
   test/golden/simple-query-postgresql
+  test/golden/simple-query-sqlite
 
 allow-newer:
   proto-lens:base

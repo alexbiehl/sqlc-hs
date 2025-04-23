@@ -1,0 +1,35 @@
+settings {
+  engine: "sqlite"
+}
+
+queries {
+  text: "SELECT * FROM users WHERE $1 > 42;"
+  name: "ListUsers"
+  cmd: "SELECT"
+  filename: "query/users.sql"
+  columns {
+    name: "id"
+    not_null: true
+    type {
+      name: "int"
+    }
+  }
+  columns {
+    name: "name"
+    not_null: true
+    type {
+      name: "text"
+    }
+  }
+  params {
+    column {
+      name: "age"
+      not_null: true
+      type {
+        name: "int"
+      }
+    }
+  }
+}
+
+global_options: "{ \"cabal_package_name\": \"simple-query-sqlite\" }"

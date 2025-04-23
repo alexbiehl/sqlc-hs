@@ -218,7 +218,8 @@ overrideToMatcher override =
 builtins :: [Matcher]
 builtins =
   [ Matcher {engine = Just "postgresql", matcher = postgresBuiltin},
-    Matcher {engine = Just "mysql", matcher = mysqlBuiltin}
+    Matcher {engine = Just "mysql", matcher = mysqlBuiltin},
+    Matcher {engine = Just "sqlite", matcher = mysqlBuiltin} -- TODO
   ]
 
 data Matcher = Matcher

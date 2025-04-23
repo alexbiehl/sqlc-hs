@@ -42,3 +42,4 @@ instance Database.PostgreSQL.Simple.FromRow.FromRow (Result "ListUsers") where
       <$> Database.PostgreSQL.Simple.FromRow.field
       <*> Database.PostgreSQL.Simple.FromRow.field
 
+

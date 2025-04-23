@@ -1,6 +1,6 @@
 module Queries
   ( module Queries.Internal,
-    module Queries,
+    module Queries
   )
 where
 

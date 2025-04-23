@@ -204,7 +204,127 @@ data Matcher = Matcher
   }
 
 mysqlBuiltin :: Proto.Protos.Codegen.Column -> Maybe (NonEmpty HaskellType)
-mysqlBuiltin _column = Nothing
+mysqlBuiltin column =
+  asum
+    [ typ ["varchar", "text", "char", "tinytext", "mediumtext", "longtext"] "text" "Data.Text.Text",
+      do
+        guard $
+          columnType == "tinyint"
+
+        if column ^. #length == 1
+          then
+            Just $
+              pure
+                HaskellType
+                  { package = Just "base",
+                    module' = Just "GHC.Types",
+                    name = Just "GHC.Types.Bool"
+                  }
+          else
+            if column ^. #unsigned
+              then
+                Just $
+                  pure
+                    HaskellType
+                      { package = Just "base",
+                        module' = Just "Data.Word",
+                        name = Just "Data.Word.Word8"
+                      }
+              else
+                Just $
+                  pure
+                    HaskellType
+                      { package = Just "base",
+                        module' = Just "Data.Int",
+                        name = Just "Data.Int.Int8"
+                      },
+      do
+        guard $
+          columnType == "smallint"
+        if column ^. #unsigned
+          then
+            Just $
+              pure
+                HaskellType
+                  { package = Just "base",
+                    module' = Just "Data.Word",
+                    name = Just "Data.Word.Word16"
+                  }
+          else
+            Just $
+              pure
+                HaskellType
+                  { package = Just "base",
+                    module' = Just "Data.Int",
+                    name = Just "Data.Int.Int16"
+                  },
+      do
+        guard $
+          columnType `elem` ["int", "integer", "mediumint"]
+        if column ^. #unsigned
+          then
+            Just $
+              pure
+                HaskellType
+                  { package = Just "base",
+                    module' = Just "Data.Word",
+                    name = Just "Data.Word.Word32"
+                  }
+          else
+            Just $
+              pure
+                HaskellType
+                  { package = Just "base",
+                    module' = Just "Data.Int",
+                    name = Just "Data.Int.Int32"
+                  },
+      do
+        guard $
+          columnType == "bigint"
+        if column ^. #unsigned
+          then
+            Just $
+              pure
+                HaskellType
+                  { package = Just "base",
+                    module' = Just "Data.Word",
+                    name = Just "Data.Word.Word64"
+                  }
+          else
+            Just $
+              pure
+                HaskellType
+                  { package = Just "base",
+                    module' = Just "Data.Int",
+                    name = Just "Data.Int.Int64"
+                  },
+      typ ["blob", "binary", "varbinary", "tinyblob", "mediumblob", "longblob"] "bytestring" "Data.ByteString.Short.ShortByteString",
+      typ ["double", "double precision", "real", "float"] "base" "GHC.Types.Double",
+      typ ["decimal", "dec", "fixed"] "scientific" "Data.Scientific.Scientific",
+      typ ["enum"] "text" "Data.Text.Text",
+      typ ["boolean", "bool"] "base" "GHC.Types.Bool",
+      typ ["json"] "aeson" "Data.Aeson.Value"
+    ]
+  where
+    columnType :: Text
+    columnType =
+      columnDataType (column ^. #type')
+
+    typ mysqlTypes package qualifiedType
+      | columnType `elem` mysqlTypes =
+          pure $
+            pure
+              HaskellType
+                { package =
+                    Just package,
+                  module' =
+                    Just
+                      (Data.Text.intercalate "." (Data.List.init (Data.Text.splitOn "." qualifiedType))),
+                  name =
+                    Just qualifiedType
+                }
+      | otherwise =
+          Nothing
 
 postgresBuiltin :: Proto.Protos.Codegen.Column -> Maybe (NonEmpty HaskellType)
 postgresBuiltin column =

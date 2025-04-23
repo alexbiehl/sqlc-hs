@@ -232,8 +232,8 @@ codegenQuery internalModule resolveName resolveType query = do
 
   let importedTypes :: [HaskellType]
       importedTypes =
-        concatMap (toList . snd) (toList parameterColumns)
-          <> concatMap (toList . snd) (toList resultColumns)
+        foldMap (toList . snd) parameterColumns
+          <> foldMap (toList . snd) resultColumns
 
       -- Modules that the query module needs to import.
       imports :: [Text]

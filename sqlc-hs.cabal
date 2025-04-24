@@ -52,9 +52,9 @@ library sqlc-hs-protos
   exposed-modules:
     Proto.Protos.Codegen
     Proto.Protos.Codegen_Fields
-  build-depends:
-    proto-lens-runtime
-  hs-source-dirs: sqlc-hs-protos
+
+  build-depends:    proto-lens-runtime
+  hs-source-dirs:   sqlc-hs-protos
   default-language: GHC2021
 
 library
@@ -93,31 +93,26 @@ executable sqlc-hs
   default-language: GHC2021
 
 test-suite sqlc-hs-test
-  import:           stuff
-  default-language: GHC2021
-
+  import:             stuff
+  default-language:   GHC2021
   build-depends:
-    tasty,
-    tasty-golden,
-    filepath,
-    process,
-    process-extras,
-    sqlc-hs,
-    bytestring,
-    proto-lens,
-    sqlc-hs:sqlc-hs-protos
+    , bytestring
+    , directory
+    , filepath
+    , process
+    , process-extras
+    , proto-lens
+    , sqlc-hs:{sqlc-hs, sqlc-hs-protos}
+    , tasty
+    , tasty-golden
+    , temporary
 
-  build-tool-depends:
-    tasty-discover:tasty-discover
-
-  build-tool-depends:
-    sqlc-hs:sqlc-hs
-
-  other-modules:
-    Test.Sqlc.Hs.Golden
+  build-tool-depends: tasty-discover:tasty-discover
+  build-tool-depends: sqlc-hs:sqlc-hs
+  other-modules:      Test.Sqlc.Hs.Golden
 
   -- other-extensions:
-  type:             exitcode-stdio-1.0
-  hs-source-dirs:   test
-  main-is:          Driver.hs
-  build-depends:    sqlc-hs
+  type:               exitcode-stdio-1.0
+  hs-source-dirs:     test
+  main-is:            Driver.hs
+  build-depends:      sqlc-hs

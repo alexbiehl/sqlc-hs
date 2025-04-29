@@ -7,7 +7,7 @@ version:            0.1.0.0
 license:            Apache-2.0
 license-file:       LICENSE
 author:             Alex Hansen
-maintainer:         alex.hansen@gmail.com
+maintainer:         alex.biehl@gmail.com
 homepage:           https://github.com/alexbiehl/sqlc-hs
 bug-reports:        https://github.com/alexbiehl/sqlc-hs/issues
 category:           Development
@@ -18,6 +18,7 @@ synopsis:
 build-type:         Simple
 extra-doc-files:    CHANGELOG.md
 extra-source-files:
+  README.md
   templates/internal.mysql.hs.jinja
   templates/internal.postgresql.hs.jinja
   templates/internal.sqlite.hs.jinja

@@ -83,7 +83,7 @@ jobs:
         run: |
           cabal sdist
           TARBALL=$(ls dist-newstyle/sdist/*.tar.gz)
-          cabal upload --token="$HACKAGE_TOKEN" "$TARBALL"
+          cabal upload --publish --token="$HACKAGE_TOKEN" "$TARBALL"
 
   # build-wasm:
   #   runs-on: ubuntu-22.04

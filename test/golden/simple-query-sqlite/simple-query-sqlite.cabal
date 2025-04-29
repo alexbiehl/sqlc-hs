@@ -6,6 +6,7 @@ library
     base,
     sqlite-simple,
     text,
+    vector,
   exposed-modules:
     Queries
     Queries.Internal

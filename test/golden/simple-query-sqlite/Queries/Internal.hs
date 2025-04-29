@@ -1,14 +1,32 @@
 {-# LANGUAGE DataKinds #-}
+{-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE TypeFamilies #-}
 module Queries.Internal (
     Query(..),
     Params,
     Result,
 
+    -- * :execResult
+    ExecResult(..),
+    execResult,
+
+    -- * :exec
     exec,
+
+    -- * :execrows
+    execRows,
+
+    -- * :execlastid
+    execLastId,
+
+    -- * :one
     queryOne,
+
+    -- * :many
     queryMany,
+    fold,
 
     -- * Reexports
     Database.SQLite.Simple.Connection,
@@ -17,8 +35,11 @@ module Queries.Internal (
   ) where
 
 import Database.SQLite.Simple (Connection, FromRow, ToRow)
-import qualified Database.SQLite.Simple
 import GHC.TypeLits (Symbol)
+import qualified Data.Int
+import qualified Database.SQLite.Simple
+import qualified Data.Vector
+import qualified Data.Vector.Mutable
 
 newtype Query (name :: Symbol) (command :: Symbol)
   = Query Database.SQLite.Simple.Query
@@ -27,8 +48,56 @@ data family Params (name :: Symbol)
 
 data family Result (name :: Symbol)
 
-exec :: Connection -> Query name ":exec" -> Params name -> IO ()
-exec = undefined
+data ExecResult = ExecResult
+  { lastInsertId :: !Data.Int.Int64,
+    rowsAffected :: !Data.Int.Int64
+  }
+
+exec ::
+  (ToRow (Params name)) =>
+  Connection ->
+  Query name ":exec" ->
+  Params name ->
+  IO ()
+exec connection (Query sql) =
+  Database.SQLite.Simple.execute connection sql
+
+execRows ::
+  (ToRow (Params name)) =>
+  Connection ->
+  Query name ":execrows" ->
+  Params name ->
+  IO Data.Int.Int64
+execRows connection (Query sql) params = do
+  Database.SQLite.Simple.execute connection sql params
+  rowsAffected <- Database.SQLite.Simple.changes connection
+  pure (fromIntegral rowsAffected)
+
+execLastId ::
+  (ToRow (Params name)) =>
+  Connection ->
+  Query name ":execlastid" ->
+  Params name ->
+  IO Data.Int.Int64
+execLastId connection (Query sql) params = do
+  Database.SQLite.Simple.execute connection sql params
+  lastInsertId <- Database.SQLite.Simple.lastInsertRowId connection
+  pure lastInsertId
+
+execResult ::
+  (ToRow (Params name)) =>
+  Connection ->
+  Query name ":execresult" ->
+  Params name ->
+  IO ExecResult
+execResult connection (Query sql) params = do
+  Database.SQLite.Simple.execute connection sql params
+  rowsAffected <- Database.SQLite.Simple.changes connection
+  lastInsertId <- Database.SQLite.Simple.lastInsertRowId connection
+  pure ExecResult {
+    lastInsertId,
+    rowsAffected = fromIntegral rowsAffected
+  }
 
 queryOne ::
   (ToRow (Params name), FromRow (Result name)) =>
@@ -42,11 +111,41 @@ queryOne connection (Query sql) params = do
     [] -> pure Nothing
     x : _ -> pure (Just x)
 
+data Grow a =
+  Grow
+    !Int
+    {-# UNPACK #-} !(Data.Vector.Mutable.IOVector a)
+
 queryMany ::
   (ToRow (Params name), FromRow (Result name)) =>
   Connection ->
   Query name ":many" ->
   Params name ->
-  IO [Result name]
-queryMany connection (Query sql) =
-  Database.SQLite.Simple.query connection sql
+  IO (Data.Vector.Vector (Result name))
+queryMany connection query params = do
+  vector <- Data.Vector.Mutable.unsafeNew 4
+  Grow i vector <- fold connection query params (Grow 0 vector) step
+  vector <- Data.Vector.unsafeFreeze vector
+  pure $! Data.Vector.unsafeTake i vector
+  where
+    step (Grow i vector) !result
+      | i < Data.Vector.Mutable.length vector = do
+          Data.Vector.Mutable.unsafeWrite vector i result
+          pure $! Grow (i + 1) vector
+      | otherwise = do
+          -- Grow vector exponentially by doubling its size
+          vector <- Data.Vector.Mutable.unsafeGrow vector i
+          Data.Vector.Mutable.unsafeWrite vector i result
+          pure $! Grow (i + 1) vector
+
+fold ::
+  (ToRow (Params name), FromRow (Result name)) =>
+  Connection ->
+  Query name ":many" ->
+  Params name ->
+  a ->
+  (a -> Result name -> IO a) ->
+  IO a
+fold connection (Query sql) =
+  Database.SQLite.Simple.fold connection sql
+{-# INLINABLE fold #-}

@@ -143,7 +143,8 @@ codegenInternal engine internal = do
         "sqlite" ->
           ( internalSqliteTemplate,
             [ HaskellType {package = Just "sqlite-simple", module' = Just "Database.SQLite.Simple", name = Just "ToRow"},
-              HaskellType {package = Just "sqlite-simple", module' = Just "Database.SQLite.Simple", name = Just "FromRow"}
+              HaskellType {package = Just "sqlite-simple", module' = Just "Database.SQLite.Simple", name = Just "FromRow"},
+              HaskellType {package = Just "vector", module' = Just "Data.Vector", name = Just "Vector"}
             ]
           )
         "mysql" ->

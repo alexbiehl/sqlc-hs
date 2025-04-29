@@ -111,10 +111,7 @@ queryOne connection (Query sql) params = do
     [] -> pure Nothing
     x : _ -> pure (Just x)
 
-data Grow a =
-  Grow
-    !Int
-    {-# UNPACK #-} !(Data.Vector.Mutable.IOVector a)
+data Grow v = Grow !Int !v
 
 queryMany ::
   (ToRow (Params name), FromRow (Result name)) =>

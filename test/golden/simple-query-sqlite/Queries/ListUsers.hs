@@ -21,12 +21,12 @@ query_ListUsers = Query "SELECT * FROM users WHERE $1 > 42;"
 
 data instance Params "ListUsers" = Params_ListUsers
   {
-    age :: Data.Int.Int32
+    age :: Data.Int.Int64
   }
 
 data instance Result "ListUsers" = Result_ListUsers
   {
-    id :: !Data.Int.Int32,
+    id :: !Data.Int.Int64,
     name :: !Data.Text.Text
   }
 

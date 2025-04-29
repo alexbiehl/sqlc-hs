@@ -219,7 +219,7 @@ builtins :: [Matcher]
 builtins =
   [ Matcher {engine = Just "postgresql", matcher = postgresBuiltin},
     Matcher {engine = Just "mysql", matcher = mysqlBuiltin},
-    Matcher {engine = Just "sqlite", matcher = mysqlBuiltin} -- TODO
+    Matcher {engine = Just "sqlite", matcher = sqliteBuiltin}
   ]
 
 data Matcher = Matcher
@@ -375,6 +375,92 @@ applyNullable column types
           Nothing
   | otherwise =
       types
+
+sqliteBuiltin :: Proto.Protos.Codegen.Column -> Maybe (NonEmpty HaskellType)
+sqliteBuiltin column =
+  applyNullable column $
+    asum
+      [ do
+          guard $
+            columnType `elem`  ["int", "integer", "tinyint", "smallint", "mediumint", "bigint", "unsignedbigint", "int2", "int8"]
+          if column ^. #unsigned
+            then
+              Just $
+                pure
+                  HaskellType
+                    { package = Just "base",
+                      module' = Just "Data.Word",
+                      name = Just "Data.Word.Word64"
+                    }
+            else
+              Just $
+                pure
+                  HaskellType
+                    { package = Just "base",
+                      module' = Just "Data.Int",
+                      name = Just "Data.Int.Int64"
+                    },
+
+        sqliteType ["blob"] "bytestring" "Data.ByteString.ByteString",
+        sqliteType ["real", "double", "doubleprecision", "float"] "ghc-prim" "GHC.Types.Double",
+        sqliteType ["bool", "boolean"] "ghc-prim" "GHC.Types.Bool",
+        sqliteType ["date", "datetime", "timestamp"] "time" "Data.Time.UTCTime",
+
+        do
+          guard $
+            or [
+              "character" `Data.Text.isPrefixOf` columnType,
+              "varchar" `Data.Text.isPrefixOf` columnType,
+              "varyingcharacter" `Data.Text.isPrefixOf` columnType,
+              "nchar" `Data.Text.isPrefixOf` columnType,
+              "nativecharacter" `Data.Text.isPrefixOf` columnType,
+              "nvarchar" `Data.Text.isPrefixOf` columnType,
+              columnType `elem` [
+                "text",
+                "clob"
+              ]
+            ]
+          Just $
+                pure
+                  HaskellType
+                    { package = Just "text",
+                      module' = Just "Data.Text",
+                      name = Just "Data.Text.Text"
+                    },
+        do
+          guard $
+            or [
+              "decimal" `Data.Text.isPrefixOf` columnType,
+              columnType == "numeric"
+            ]
+          Just $
+                pure
+                  HaskellType
+                    { package = Just "ghc-prim",
+                      module' = Just "GHC.Types",
+                      name = Just "GHC.Types.Double"
+                    }
+      ]
+  where
+    columnType :: Text
+    columnType =
+      columnDataType (column ^. #type')
+
+    sqliteType dbType package qualifiedType
+      | columnType `elem` dbType =
+          pure $
+            pure
+              HaskellType
+                { package =
+                    Just package,
+                  module' =
+                    Just
+                      (Data.Text.intercalate "." (Data.List.init (Data.Text.splitOn "." qualifiedType))),
+                  name =
+                    Just qualifiedType
+                }
+      | otherwise =
+          Nothing
 
 postgresBuiltin :: Proto.Protos.Codegen.Column -> Maybe (NonEmpty HaskellType)
 postgresBuiltin column =

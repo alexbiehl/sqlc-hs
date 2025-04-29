@@ -65,6 +65,26 @@ jobs:
           tag_name: ${{ needs.create_release.outputs.tag-name }}
           files: artifacts/sqlc-hs_${{ github.ref_name }}-${{ steps.triple.outputs.triple }}
 
+  hackage_release:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v3
+
+      - name: Set up GHC
+        uses: haskell-actions/setup@v2.7.11
+        with:
+          ghc-version: 9.10.1
+
+      - name: Upload to Hackage
+        env:
+          HACKAGE_TOKEN: ${{ secrets.HACKAGE_TOKEN }}
+        run: |
+          cabal sdist
+          TARBALL=$(ls dist-newstyle/sdist/*.tar.gz)
+          cabal upload --token="$HACKAGE_TOKEN" "$TARBALL"
+
   # build-wasm:
   #   runs-on: ubuntu-22.04
   #   defaults:

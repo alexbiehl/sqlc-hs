@@ -1,14 +1,28 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE TypeFamilies #-}
 module {{ moduleName }} (
     Query(..),
     Params,
     Result,
 
+    -- * :execResult
+    ExecResult(..),
+    execResult,
+
+    -- * :exec
     exec,
+
+    -- * :execrows
+    execRows,
+
+    -- * :one
     queryOne,
+
+    -- * :many
     queryMany,
+    fold,
 
     -- * Reexports
     Database.PostgreSQL.Simple.Connection,
@@ -18,9 +32,10 @@ module {{ moduleName }} (
 
 import Data.Vector (Vector)
 import Database.PostgreSQL.Simple (Connection, FromRow, ToRow)
+import GHC.TypeLits (Symbol)
+import qualified Data.Int
 import qualified Database.PostgreSQL.Simple
 import qualified Database.PostgreSQL.Simple.Vector
-import GHC.TypeLits (Symbol)
 
 newtype Query (name :: Symbol) (command :: Symbol)
   = Query Database.PostgreSQL.Simple.Query
@@ -29,8 +44,40 @@ data family Params (name :: Symbol)
 
 data family Result (name :: Symbol)
 
-exec :: Connection -> Query name ":exec" -> Params name -> IO ()
-exec = undefined
+data ExecResult = ExecResult
+  { rowsAffected :: !Data.Int.Int64
+  }
+
+exec ::
+  (ToRow (Params name)) =>
+  Connection ->
+  Query name ":exec" ->
+  Params name ->
+  IO ()
+exec connection (Query sql) params = do
+  _rowsAffected <- Database.PostgreSQL.Simple.execute connection sql params
+  pure ()
+
+execRows ::
+  (ToRow (Params name)) =>
+  Connection ->
+  Query name ":execrows" ->
+  Params name ->
+  IO Data.Int.Int64
+execRows connection (Query sql) = do
+  Database.PostgreSQL.Simple.execute connection sql
+
+execResult ::
+  (ToRow (Params name)) =>
+  Connection ->
+  Query name ":execresult" ->
+  Params name ->
+  IO ExecResult
+execResult connection (Query sql) params = do
+  rowsAffected <- Database.PostgreSQL.Simple.execute connection sql params
+  pure ExecResult {
+    rowsAffected
+  }
 
 queryOne ::
   (ToRow (Params name), FromRow (Result name)) =>
@@ -52,3 +99,15 @@ queryMany ::
   IO (Vector (Result name))
 queryMany connection (Query sql) =
   Database.PostgreSQL.Simple.Vector.query connection sql
+
+fold ::
+  (ToRow (Params name), FromRow (Result name)) =>
+  Connection ->
+  Query name ":many" ->
+  Params name ->
+  a ->
+  (a -> Result name -> IO a) ->
+  IO a
+fold connection (Query sql) =
+  Database.PostgreSQL.Simple.fold connection sql
+{-# INLINABLE fold #-}

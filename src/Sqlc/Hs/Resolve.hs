@@ -382,7 +382,7 @@ sqliteBuiltin column =
     asum
       [ do
           guard $
-            columnType `elem`  ["int", "integer", "tinyint", "smallint", "mediumint", "bigint", "unsignedbigint", "int2", "int8"]
+            columnType `elem` ["int", "integer", "tinyint", "smallint", "mediumint", "bigint", "unsignedbigint", "int2", "int8"]
           if column ^. #unsigned
             then
               Just $
@@ -400,46 +400,44 @@ sqliteBuiltin column =
                       module' = Just "Data.Int",
                       name = Just "Data.Int.Int64"
                     },
-
         sqliteType ["blob"] "bytestring" "Data.ByteString.ByteString",
         sqliteType ["real", "double", "doubleprecision", "float"] "ghc-prim" "GHC.Types.Double",
         sqliteType ["bool", "boolean"] "ghc-prim" "GHC.Types.Bool",
         sqliteType ["date", "datetime", "timestamp"] "time" "Data.Time.UTCTime",
-
         do
           guard $
-            or [
-              "character" `Data.Text.isPrefixOf` columnType,
-              "varchar" `Data.Text.isPrefixOf` columnType,
-              "varyingcharacter" `Data.Text.isPrefixOf` columnType,
-              "nchar" `Data.Text.isPrefixOf` columnType,
-              "nativecharacter" `Data.Text.isPrefixOf` columnType,
-              "nvarchar" `Data.Text.isPrefixOf` columnType,
-              columnType `elem` [
-                "text",
-                "clob"
+            or
+              [ "character" `Data.Text.isPrefixOf` columnType,
+                "varchar" `Data.Text.isPrefixOf` columnType,
+                "varyingcharacter" `Data.Text.isPrefixOf` columnType,
+                "nchar" `Data.Text.isPrefixOf` columnType,
+                "nativecharacter" `Data.Text.isPrefixOf` columnType,
+                "nvarchar" `Data.Text.isPrefixOf` columnType,
+                columnType
+                  `elem` [ "text",
+                           "clob"
+                         ]
               ]
-            ]
           Just $
-                pure
-                  HaskellType
-                    { package = Just "text",
-                      module' = Just "Data.Text",
-                      name = Just "Data.Text.Text"
-                    },
+            pure
+              HaskellType
+                { package = Just "text",
+                  module' = Just "Data.Text",
+                  name = Just "Data.Text.Text"
+                },
         do
           guard $
-            or [
-              "decimal" `Data.Text.isPrefixOf` columnType,
-              columnType == "numeric"
-            ]
+            or
+              [ "decimal" `Data.Text.isPrefixOf` columnType,
+                columnType == "numeric"
+              ]
           Just $
-                pure
-                  HaskellType
-                    { package = Just "ghc-prim",
-                      module' = Just "GHC.Types",
-                      name = Just "GHC.Types.Double"
-                    }
+            pure
+              HaskellType
+                { package = Just "ghc-prim",
+                  module' = Just "GHC.Types",
+                  name = Just "GHC.Types.Double"
+                }
       ]
   where
     columnType :: Text

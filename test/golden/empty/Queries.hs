@@ -4,4 +4,4 @@ module Queries
   )
 where
 
-import qualified Queries.Internal
+import Queries.Internal

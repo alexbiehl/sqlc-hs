@@ -4,7 +4,7 @@ module {{ moduleName }}
   )
 where
 
-import qualified {{ internalModuleName }}
+import {{ internalModuleName }}
 {% for module in modules %}
-import qualified {{ module.value }} as Queries
+import {{ module.value }} as Queries
 {% endfor %}

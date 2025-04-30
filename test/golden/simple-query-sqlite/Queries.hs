@@ -4,5 +4,5 @@ module Queries
   )
 where
 
-import qualified Queries.Internal
-import qualified Queries.ListUsers as Queries
+import Queries.Internal
+import Queries.ListUsers as Queries

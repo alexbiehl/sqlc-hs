@@ -4,4 +4,4 @@ module Foo.Bar
   )
 where
 
-import qualified Foo.Bar.Internal
+import Foo.Bar.Internal

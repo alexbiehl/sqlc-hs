@@ -32,4 +32,4 @@ queries {
   }
 }
 
-global_options: "{ \"cabal_package_name\": \"simple-query-sqlite\" }"
+global_options: "{ \"cabal_package_name\": \"simple-query-sqlite\", \"cabal_default_extensions\": [\"OverloadedStrings\", \"StrictData\"] }"

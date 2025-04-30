@@ -179,7 +179,8 @@ codegenCabalFile config generatedModules
               [ "packageName" Text.EDE..= packageName,
                 "packageVersion" Text.EDE..= config.cabalPackageVersion,
                 "buildDepends" Text.EDE..= buildDepends,
-                "exposedModules" Text.EDE..= exposedModules
+                "exposedModules" Text.EDE..= exposedModules,
+                "defaultExtensions" Text.EDE..= defaultExtensions
               ]
       pure
         [ File
@@ -212,6 +213,10 @@ codegenCabalFile config generatedModules
         map
           (.name)
           generatedModules
+
+    defaultExtensions :: [Text]
+    defaultExtensions =
+      sort (ordNub config.cabalDefaultExtensions)
 
 -- | Generate a file for a single query. This returns the resolved 'HaskellType's so
 -- that we can generate the necessary build-depends for the cabal file.

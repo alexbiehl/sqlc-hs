@@ -10,3 +10,9 @@ library
   {% for module in exposedModules %}
     {{ module.value }}
   {% endfor %}
+  {% if !(defaultExtensions | empty) %}
+  default-extensions:
+  {% for defaultExtension in defaultExtensions %}
+    {{ defaultExtension.value }}
+  {% endfor %}
+  {% endif %}

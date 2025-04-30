@@ -24,6 +24,8 @@ data Config = Config
     cabalPackageName :: Maybe Text,
     -- | Package version to be used with the cabal package.
     cabalPackageVersion :: Maybe Text,
+    -- | Default extensions that will be placed in the default-extension stanza
+    cabalDefaultExtensions :: [Text],
     -- | Module prefix, e.g. Data.Queries
     haskellModulePrefix :: Maybe Text,
     -- | List of lists of overrides. Nesting is list of allowing cheap
@@ -40,6 +42,8 @@ instance Semigroup Config where
           getFirst $ First config1.cabalPackageVersion <> First config2.cabalPackageVersion,
         haskellModulePrefix =
           getFirst $ First config1.haskellModulePrefix <> First config2.haskellModulePrefix,
+        cabalDefaultExtensions =
+          config1.cabalDefaultExtensions <> config2.cabalDefaultExtensions,
         overrides =
           config1.overrides <> config2.overrides
       }
@@ -50,7 +54,8 @@ instance Monoid Config where
       { overrides = [],
         haskellModulePrefix = Nothing,
         cabalPackageName = Nothing,
-        cabalPackageVersion = Nothing
+        cabalPackageVersion = Nothing,
+        cabalDefaultExtensions = []
       }
 
 instance FromJSON Config where
@@ -58,6 +63,7 @@ instance FromJSON Config where
     Config
       <$> o .:? "cabal_package_name"
       <*> o .:? "cabal_package_version"
+      <*> o .:? "cabal_default_extensions" .!= []
       <*> o .:? "haskell_module_prefix"
       <*> fmap pure (o .:? "overrides" .!= mempty)
 
@@ -120,6 +126,7 @@ defaultConfig =
   mempty
     { cabalPackageName = Just "queries",
       cabalPackageVersion = Just "0.1.0.0",
+      cabalDefaultExtensions = [],
       haskellModulePrefix = Just "Queries",
       overrides = []
     }

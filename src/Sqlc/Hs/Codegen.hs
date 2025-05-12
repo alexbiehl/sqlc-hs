@@ -18,6 +18,7 @@ import Sqlc.Hs.Resolve
     determineTopLevelModule,
     newResolveType,
     resolveQueryName,
+    mangleQuery,
   )
 import System.Exit qualified
 import System.IO qualified
@@ -269,7 +270,7 @@ codegenQuery engine internalModule resolveName resolveType query = do
             "haskellResultName" Text.EDE..= resolvedName.toResultConstructorDeclarationName,
             "escapedQueryName" Text.EDE..= show @Text (query ^. #name),
             "escapedCommand" Text.EDE..= show @Text (query ^. #cmd),
-            "escapedSql" Text.EDE..= show @Text (query ^. #text),
+            "escapedSql" Text.EDE..= show @Text mangledQuery,
             "parameterColumns" Text.EDE..= fmap toParameterColumn parameterColumns,
             "resultColumns" Text.EDE..= fmap toResultColumn resultColumns
           ]
@@ -282,6 +283,9 @@ codegenQuery engine internalModule resolveName resolveType query = do
         contents = contents context
       }
   where
+    mangledQuery =
+      mangleQuery (query ^. #text)
+
     contents context =
       case Text.EDE.render queryTemplate context of
         Text.EDE.Success output ->
@@ -291,13 +295,13 @@ codegenQuery engine internalModule resolveName resolveType query = do
 
     toParameterColumn (column, haskellType :| _) =
       Text.EDE.fromPairs
-        [ "name" Text.EDE..= (resolveName (column ^. #name)).toFieldName,
+        [ "name" Text.EDE..= (resolveName (column ^. #name)).toFieldName column,
           "type" Text.EDE..= encodeColumnType haskellType
         ]
 
     toResultColumn (column, haskellType :| _) =
       Text.EDE.fromPairs
-        [ "name" Text.EDE..= (resolveName (column ^. #name)).toFieldName,
+        [ "name" Text.EDE..= (resolveName (column ^. #name)).toFieldName column,
           "type" Text.EDE..= encodeColumnType haskellType
         ]
 

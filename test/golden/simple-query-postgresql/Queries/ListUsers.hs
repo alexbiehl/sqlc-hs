@@ -17,7 +17,7 @@ import qualified Data.Int
 import qualified Data.Text
 
 query_ListUsers :: Query "ListUsers" "SELECT"
-query_ListUsers = Query "SELECT * FROM users WHERE $1 > 42;"
+query_ListUsers = Query "SELECT * FROM users WHERE ? > 42;"
 
 data instance Params "ListUsers" = Params_ListUsers
   {

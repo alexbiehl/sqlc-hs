@@ -8,6 +8,8 @@ module Sqlc.Hs.Resolve
     -- | Misc. modules
     determineTopLevelModule,
     determineInternalModule,
+    -- | Query mangling
+    mangleQuery,
   )
 where
 
@@ -44,7 +46,7 @@ data ResolvedNames = ResolvedNames
     toResultConstructorDeclarationName :: Text,
     toHaskellFileName :: Text,
     toHaskellModuleName :: Text,
-    toFieldName :: Text
+    toFieldName :: Proto.Protos.Codegen.Column -> Text
   }
 
 type ResolveName = Text -> ResolvedNames
@@ -128,10 +130,10 @@ resolveQueryName haskellModulePrefix name =
                     '_'
         )
 
-    toFieldName :: Text
-    toFieldName =
+    toFieldName :: Proto.Protos.Codegen.Column -> Text
+    toFieldName column =
       escapeHaskellKeyword $
-        case name of
+        case namespaced name of
           name
             | Just (c, _rest) <- Data.Text.uncons name,
               Data.Char.isDigit c ->
@@ -143,6 +145,14 @@ resolveQueryName haskellModulePrefix name =
                 Data.Char.toLower c `Data.Text.cons` rest
             | otherwise ->
                 name
+        where
+          namespaced x
+            | column ^. #tableAlias /= "" =
+                column ^. #tableAlias <> "_" <> x
+            | column ^. #table . #name /= "" =
+                column ^. #table . #name <> "_" <> x
+            | otherwise =
+                x
 
     escapeHaskellKeyword x =
       case x of
@@ -499,3 +509,12 @@ postgresBuiltin column =
                 }
       | otherwise =
           Nothing
+
+-- | Swaps every occurrence of "$x" with ? as that's what the *-simple libraries
+-- understand only.
+mangleQuery :: Text -> Text
+mangleQuery query =
+  Data.Text.intercalate "?" $
+    map mangle (Data.Text.splitOn "$" query)
+  where
+    mangle = Data.Text.dropWhile Data.Char.isDigit

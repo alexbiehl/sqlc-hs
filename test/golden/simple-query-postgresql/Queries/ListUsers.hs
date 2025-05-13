@@ -38,8 +38,8 @@ instance Database.PostgreSQL.Simple.ToRow.ToRow (Params "ListUsers") where
 
 instance Database.PostgreSQL.Simple.FromRow.FromRow (Result "ListUsers") where
   fromRow =
-    Result_ListUsers
-      <$> Database.PostgreSQL.Simple.FromRow.field
+    pure Result_ListUsers
+      <*> Database.PostgreSQL.Simple.FromRow.field
       <*> Database.PostgreSQL.Simple.FromRow.field
 
 

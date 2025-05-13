@@ -57,9 +57,9 @@ instance Database.PostgreSQL.Simple.ToRow.ToRow (Params {{ escapedQueryName }}) 
 
 instance Database.PostgreSQL.Simple.FromRow.FromRow (Result {{ escapedQueryName }}) where
   fromRow =
-    {{ haskellResultName }}
+    pure {{ haskellResultName }}
     {% for column in resultColumns %}
-      {% if column.first %}<$>{% else %}<*>{% endif%} Database.PostgreSQL.Simple.FromRow.field
+      <*> Database.PostgreSQL.Simple.FromRow.field
     {% endfor %}
 {% endif %}
 
@@ -73,9 +73,9 @@ instance Database.SQLite.Simple.ToRow.ToRow (Params {{ escapedQueryName }}) wher
 
 instance Database.SQLite.Simple.FromRow.FromRow (Result {{ escapedQueryName }}) where
   fromRow =
-    {{ haskellResultName }}
+    pure {{ haskellResultName }}
     {% for column in resultColumns %}
-      {% if column.first %}<$>{% else %}<*>{% endif%} Database.SQLite.Simple.FromRow.field
+      <*> Database.SQLite.Simple.FromRow.field
     {% endfor %}
 {% endif %}
 

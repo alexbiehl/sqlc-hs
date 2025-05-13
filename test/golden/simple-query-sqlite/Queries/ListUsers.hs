@@ -39,7 +39,7 @@ instance Database.SQLite.Simple.ToRow.ToRow (Params "ListUsers") where
 
 instance Database.SQLite.Simple.FromRow.FromRow (Result "ListUsers") where
   fromRow =
-    Result_ListUsers
-      <$> Database.SQLite.Simple.FromRow.field
+    pure Result_ListUsers
+      <*> Database.SQLite.Simple.FromRow.field
       <*> Database.SQLite.Simple.FromRow.field
 

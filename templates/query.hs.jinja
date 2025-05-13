@@ -8,7 +8,7 @@
 {-# LANGUAGE TypeFamilies #-}
 module {{moduleName}} where
 
-import {{ internalModuleName }} (Query(..), Params, Result)
+import {{ internalModuleName }} (Query(..), Enum, Params, Result)
 {% if generatePostgresql %}
 import qualified Database.PostgreSQL.Simple.FromRow
 import qualified Database.PostgreSQL.Simple.ToField

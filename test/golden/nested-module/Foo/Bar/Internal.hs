@@ -5,6 +5,7 @@ module Foo.Bar.Internal (
     Query(..),
     Params,
     Result,
+    Foo.Bar.Internal.Enum,
 
     -- * :execResult
     ExecResult(..),
@@ -45,6 +46,8 @@ newtype Query (name :: Symbol) (command :: Symbol)
 data family Params (name :: Symbol)
 
 data family Result (name :: Symbol)
+
+data family Enum (name :: Symbol)
 
 data ExecResult = ExecResult
   { lastInsertId :: !Data.Int.Int64,

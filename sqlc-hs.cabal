@@ -26,12 +26,14 @@ extra-source-files:
   templates/internal.mysql.hs.jinja
   templates/internal.postgresql.hs.jinja
   templates/internal.sqlite.hs.jinja
+  templates/types.hs.jinja
   templates/package.cabal.jinja
   templates/query.hs.jinja
   templates/toplevel.hs.jinja
   test/golden/**/*.cabal
   test/golden/**/*.hs
   test/golden/**/*.input
+  test/golden/**/*.proto
 
 source-repository head
   type:     git

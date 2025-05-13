@@ -5,7 +5,9 @@ library
   build-depends:
     base,
     postgresql-simple,
+    text,
     vector,
   exposed-modules:
     Queries
     Queries.Internal
+    Queries.Types

@@ -2,11 +2,11 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE TypeFamilies #-}
-module Queries.Internal (
+module Pulse.Database.Internal (
     Query(..),
     Params,
     Result,
-    Queries.Internal.Enum,
+    Pulse.Database.Internal.Enum,
 
     -- * :execResult
     ExecResult(..),

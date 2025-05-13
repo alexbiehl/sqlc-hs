@@ -31,7 +31,7 @@ main = do
       Right generateRequest ->
         pure generateRequest
 
-  -- System.IO.hPutStrLn System.IO.stdout (show $ generateRequest)
+  --  System.IO.hPutStrLn System.IO.stdout (show $ generateRequest)
 
   pluginOptions <-
     case Sqlc.Hs.Config.parseConfig (generateRequest ^. #pluginOptions) of

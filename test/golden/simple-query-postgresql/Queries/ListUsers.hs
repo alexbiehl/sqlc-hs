@@ -8,7 +8,7 @@
 {-# LANGUAGE TypeFamilies #-}
 module Queries.ListUsers where
 
-import Queries.Internal (Query(..), Params, Result)
+import Queries.Internal (Query(..), Enum, Params, Result)
 import qualified Database.PostgreSQL.Simple.FromRow
 import qualified Database.PostgreSQL.Simple.ToField
 import qualified Database.PostgreSQL.Simple.ToRow

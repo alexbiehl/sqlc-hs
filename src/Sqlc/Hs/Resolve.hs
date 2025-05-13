@@ -1,6 +1,8 @@
 module Sqlc.Hs.Resolve
   ( ResolveType,
+    resolveType,
     newResolveType,
+    newEnumResolver,
     -- | How to resolve names to Haskell modules and files
     ResolveName,
     ResolvedNames (..),
@@ -8,6 +10,7 @@ module Sqlc.Hs.Resolve
     -- | Misc. modules
     determineTopLevelModule,
     determineInternalModule,
+    determineTypesModule,
     -- | Query mangling
     mangleQuery,
   )
@@ -40,13 +43,23 @@ determineInternalModule haskellModulePrefix =
     (haskellModulePrefix <|> defaultConfig.haskellModulePrefix <|> Just "Queries")
     "Internal"
 
+determineTypesModule ::
+  -- | Haskell module prefix. E.g. "Data.Queries".
+  Maybe Text ->
+  ResolvedNames
+determineTypesModule haskellModulePrefix =
+  resolveQueryName
+    (haskellModulePrefix <|> defaultConfig.haskellModulePrefix <|> Just "Queries")
+    "Types"
+
 data ResolvedNames = ResolvedNames
   { toQueryDeclarationName :: Text,
     toParamsConstructorDeclarationName :: Text,
     toResultConstructorDeclarationName :: Text,
     toHaskellFileName :: Text,
     toHaskellModuleName :: Text,
-    toFieldName :: Proto.Protos.Codegen.Column -> Text
+    toFieldName :: Proto.Protos.Codegen.Column -> Text,
+    toEnumConstructorName :: Text -> Text
   }
 
 type ResolveName = Text -> ResolvedNames
@@ -73,6 +86,8 @@ resolveQueryName haskellModulePrefix name =
         "Params_" <> sanitizedName,
       toResultConstructorDeclarationName =
         "Result_" <> sanitizedName,
+      toEnumConstructorName = \typename ->
+        "Enum_" <> sanitizeHaskellIdentifier typename <> "_" <> sanitizedName,
       toFieldName,
       toHaskellFileName =
         toText $
@@ -145,14 +160,14 @@ resolveQueryName haskellModulePrefix name =
                 Data.Char.toLower c `Data.Text.cons` rest
             | otherwise ->
                 name
-        where
-          namespaced x
-            | column ^. #tableAlias /= "" =
-                column ^. #tableAlias <> "_" <> x
-            | column ^. #table . #name /= "" =
-                column ^. #table . #name <> "_" <> x
-            | otherwise =
-                x
+      where
+        namespaced x
+          | column ^. #tableAlias /= "" =
+              column ^. #tableAlias <> "_" <> x
+          | column ^. #table . #name /= "" =
+              column ^. #table . #name <> "_" <> x
+          | otherwise =
+              x
 
     escapeHaskellKeyword x =
       case x of
@@ -171,17 +186,25 @@ resolveQueryName haskellModulePrefix name =
 --
 -- The first type is the one you want use for code generation while the rest is only info for dependency
 -- and import management.
-type ResolveType = Proto.Protos.Codegen.Column -> Maybe (Proto.Protos.Codegen.Column, NonEmpty HaskellType)
+newtype ResolveType = ResolveType (Proto.Protos.Codegen.Column -> Maybe (Proto.Protos.Codegen.Column, NonEmpty HaskellType))
+
+instance Semigroup ResolveType where
+  ResolveType resolve1 <> ResolveType resolve2 =
+    ResolveType $ \column ->
+      resolve1 column <|> resolve2 column
 
 newtype Overrides a = Overrides [Vector a]
   deriving stock (Functor, Foldable, Traversable)
+
+resolveType :: ResolveType -> Proto.Protos.Codegen.Column -> Maybe (Proto.Protos.Codegen.Column, NonEmpty HaskellType)
+resolveType = coerce
 
 newResolveType ::
   Config ->
   -- | Engine, if defined
   Text ->
   ResolveType
-newResolveType config engine = \column ->
+newResolveType config engine = ResolveType $ \column ->
   case mapMaybe (\matcher -> matcher.matcher column) matchers of
     haskellTypes : _ ->
       Just (column, haskellTypes)
@@ -204,6 +227,17 @@ newResolveType config engine = \column ->
             || matcher.engine == Just engine
       ]
 
+newEnumResolver ::
+  HaskellType ->
+  [Proto.Protos.Codegen.Enum] ->
+  ResolveType
+newEnumResolver typeTemplate enums = ResolveType $ \column ->
+  case (enumMatcher typeTemplate enums).matcher column of
+    Just haskellTypes ->
+      Just (column, haskellTypes)
+    _ ->
+      Nothing
+
 columnDataType :: Proto.Protos.Codegen.Identifier -> Text
 columnDataType identifier
   | (identifier ^. #schema) /= mempty =
@@ -224,6 +258,30 @@ overrideToMatcher override =
           Just (pure override.haskellType)
       | otherwise =
           Nothing
+
+enumMatcher ::
+  -- | HaskellType pointing to the types module.
+  HaskellType ->
+  [Proto.Protos.Codegen.Enum] ->
+  Matcher
+enumMatcher typeTemplate enums =
+  Matcher
+    { engine = Nothing,
+      matcher = \column ->
+        case find
+          (\enum -> (enum ^. #name) == columnDataType (column ^. #type'))
+          enums of
+          Just enum ->
+            Just $
+              pure
+                typeTemplate
+                  { name =
+                      typeTemplate.module' <&> \module' ->
+                        "(" <> module' <> "." <> "Enum " <> show @Text (enum ^. #name) <> ")"
+                  }
+          Nothing ->
+            Nothing
+    }
 
 builtins :: [Matcher]
 builtins =

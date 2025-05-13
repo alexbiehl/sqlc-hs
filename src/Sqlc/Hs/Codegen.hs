@@ -16,9 +16,12 @@ import Sqlc.Hs.Resolve
     ResolvedNames (..),
     determineInternalModule,
     determineTopLevelModule,
+    determineTypesModule,
+    mangleQuery,
+    newEnumResolver,
     newResolveType,
     resolveQueryName,
-    mangleQuery,
+    resolveType,
   )
 import System.Exit qualified
 import System.IO qualified
@@ -45,6 +48,28 @@ data Module = Module
 
 codegen :: Config -> Proto.Protos.Codegen.GenerateRequest -> IO [File]
 codegen config generateRequest = do
+  typesModule <-
+    codegenTypes
+      (generateRequest ^. #settings . #engine)
+      internalName
+      typesName
+      resolveName
+      (generateRequest ^. #catalog . #schemas)
+
+  let resolveType =
+        newResolveType config (generateRequest ^. #settings . #engine)
+          <> newEnumResolver
+            ( HaskellType
+                { module' = Just typesModule.name,
+                  package = Nothing,
+                  name = Nothing
+                }
+            )
+            [ enum
+              | schema <- generateRequest ^. #catalog . #schemas,
+                enum <- schema ^. #enums
+            ]
+
   modules <-
     traverse
       ( codegenQuery
@@ -56,22 +81,19 @@ codegen config generateRequest = do
       (toList (generateRequest ^. #queries))
 
   toplevelModule <-
-    codegenToplevel toplevelName internalName modules
+    codegenToplevel toplevelName internalName typesName modules
 
   internalModule <-
     codegenInternal (generateRequest ^. #settings . #engine) internalName
 
   let generatedModules =
-        toplevelModule : internalModule : modules
+        toplevelModule : typesModule : internalModule : modules
 
   cabalPackageFile <-
     codegenCabalFile config generatedModules
 
   pure (cabalPackageFile <> map moduleToFile generatedModules)
   where
-    resolveType =
-      newResolveType config (generateRequest ^. #settings . #engine)
-
     resolveName =
       resolveQueryName config.haskellModulePrefix
 
@@ -80,6 +102,9 @@ codegen config generateRequest = do
 
     internalName =
       determineInternalModule config.haskellModulePrefix
+
+    typesName =
+      determineTypesModule config.haskellModulePrefix
 
 moduleToFile :: Module -> File
 moduleToFile module_ =
@@ -93,13 +118,16 @@ codegenToplevel ::
   ResolvedNames ->
   -- | ResolvedName of the internal module name
   ResolvedNames ->
+  -- | ResolvedName of the types module name
+  ResolvedNames ->
   [Module] ->
   IO Module
-codegenToplevel toplevel internal modulesToReexport = do
+codegenToplevel toplevel internal types modulesToReexport = do
   let context =
         Text.EDE.fromPairs
           [ "moduleName" Text.EDE..= toplevel.toHaskellModuleName,
             "internalModuleName" Text.EDE..= internal.toHaskellModuleName,
+            "typesModuleName" Text.EDE..= types.toHaskellModuleName,
             "modules" Text.EDE..= fmap (.name) modulesToReexport
           ]
 
@@ -134,7 +162,9 @@ codegenInternal engine internal = do
       { name = internal.toHaskellModuleName,
         fileName = internal.toHaskellFileName,
         importedTypes =
-          [HaskellType {package = Just "base", module' = Nothing, name = Nothing}]
+          [ HaskellType {package = Just "base", module' = Nothing, name = Nothing},
+            HaskellType {package = Just "text", module' = Nothing, name = Nothing}
+          ]
             <> dependencies,
         contents = contents context
       }
@@ -219,6 +249,58 @@ codegenCabalFile config generatedModules
     defaultExtensions =
       sort (ordNub config.cabalDefaultExtensions)
 
+codegenTypes ::
+  -- | Engine, if defined
+  Text ->
+  -- | ResolvedName of the internal module
+  ResolvedNames ->
+  -- | ResolvedName of the types module
+  ResolvedNames ->
+  ResolveName ->
+  [Proto.Protos.Codegen.Schema] ->
+  IO Module
+codegenTypes engine internalModule typesModule resolveName schemas = do
+  let context =
+        Text.EDE.fromPairs
+          [ "generatePostgresql" Text.EDE..= (engine == "postgresql"),
+            "generateSqlite" Text.EDE..= (engine == "sqlite"),
+            "generateMysql" Text.EDE..= (engine == "mysql"),
+            "moduleName" Text.EDE..= typesModule.toHaskellModuleName,
+            "internalModuleName" Text.EDE..= internalModule.toHaskellModuleName,
+            "enums"
+              Text.EDE..= [ Text.EDE.fromPairs
+                              [ "escapedEnumName" Text.EDE..= show @Text (enum ^. #name),
+                                "values"
+                                  Text.EDE..= [ Text.EDE.fromPairs
+                                                  [ "escapedEnumValue" Text.EDE..= show @Text value,
+                                                    "haskellConstructorName" Text.EDE..= (resolveName value).toEnumConstructorName (enum ^. #name)
+                                                  ]
+                                                | value <- toList (enum ^. #vals)
+                                              ]
+                              ]
+                            | schema <-
+                                schemas,
+                              enum <-
+                                schema ^. #enums,
+                              (schema ^. #name) `notElem` ["pg_catalog", "information_schema"]
+                          ]
+          ]
+
+  pure
+    Module
+      { name = typesModule.toHaskellModuleName,
+        fileName = typesModule.toHaskellFileName,
+        importedTypes = [],
+        contents = contents context
+      }
+  where
+    contents context =
+      case Text.EDE.render typesTemplate context of
+        Text.EDE.Success output ->
+          encodeUtf8 (toStrict @LText @Text output)
+        Text.EDE.Failure errorDoc ->
+          error (show errorDoc)
+
 -- | Generate a file for a single query. This returns the resolved 'HaskellType's so
 -- that we can generate the necessary build-depends for the cabal file.
 codegenQuery ::
@@ -230,18 +312,18 @@ codegenQuery ::
   ResolveType ->
   Proto.Protos.Codegen.Query ->
   IO Module
-codegenQuery engine internalModule resolveName resolveType query = do
+codegenQuery engine internalModule resolveName resolver query = do
   let resolvedName =
         resolveName (query ^. #name)
 
   parameterColumns <-
     forM (query ^. #params) $ \parameter -> do
-      whenNothing (resolveType (parameter ^. #column)) $
+      whenNothing (resolveType resolver (parameter ^. #column)) $
         couldNotResolveType (parameter ^. #column)
 
   resultColumns <-
     forM (query ^. #columns) $ \column -> do
-      whenNothing (resolveType column) $
+      whenNothing (resolveType resolver column) $
         couldNotResolveType column
 
   let importedTypes :: [HaskellType]
@@ -339,6 +421,18 @@ queryTemplate =
     template :: ByteString
     template =
       $(Data.FileEmbed.embedFile "templates/query.hs.jinja")
+
+typesTemplate :: Text.EDE.Template
+typesTemplate =
+  case Text.EDE.parse template of
+    Text.EDE.Success template ->
+      template
+    Text.EDE.Failure errorDoc ->
+      error (show errorDoc)
+  where
+    template :: ByteString
+    template =
+      $(Data.FileEmbed.embedFile "templates/types.hs.jinja")
 
 internalPostgresTemplate :: Text.EDE.Template
 internalPostgresTemplate =

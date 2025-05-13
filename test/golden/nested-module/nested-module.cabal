@@ -5,6 +5,8 @@ library
   build-depends:
     base,
     mysql-simple,
+    text,
   exposed-modules:
     Foo.Bar
     Foo.Bar.Internal
+    Foo.Bar.Types

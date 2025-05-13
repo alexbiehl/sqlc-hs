@@ -8,7 +8,7 @@
 {-# LANGUAGE TypeFamilies #-}
 module Queries.ListUsers where
 
-import Queries.Internal (Query(..), Params, Result)
+import Queries.Internal (Query(..), Enum, Params, Result)
 import qualified Database.MySQL.Simple.Param
 import qualified Database.MySQL.Simple.QueryParams
 import qualified Database.MySQL.Simple.QueryResults

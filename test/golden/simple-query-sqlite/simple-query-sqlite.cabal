@@ -11,6 +11,7 @@ library
     Queries
     Queries.Internal
     Queries.ListUsers
+    Queries.Types
   default-extensions:
     OverloadedStrings
     StrictData

@@ -10,3 +10,4 @@ library
     Queries
     Queries.Internal
     Queries.ListUsers
+    Queries.Types

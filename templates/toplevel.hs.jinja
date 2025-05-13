@@ -1,10 +1,12 @@
 module {{ moduleName }}
   ( module {{ internalModuleName }},
+    module {{ typesModuleName }},
     module Queries
   )
 where
 
 import {{ internalModuleName }}
+import {{ typesModuleName }}
 {% for module in modules %}
 import {{ module.value }} as Queries
 {% endfor %}

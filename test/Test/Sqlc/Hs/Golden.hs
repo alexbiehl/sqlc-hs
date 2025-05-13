@@ -6,7 +6,7 @@ import Data.ProtoLens.Labels ()
 import Proto.Protos.Codegen qualified
 import System.Directory qualified
 import System.Exit (ExitCode (..))
-import System.FilePath (dropExtension, (</>))
+import System.FilePath (takeExtension, dropExtension, (</>))
 import System.IO qualified
 import System.IO.Error qualified
 import System.IO.Temp qualified
@@ -18,7 +18,7 @@ import Test.Tasty.Golden.Advanced (goldenTest)
 
 test_golden :: IO [TestTree]
 test_golden = do
-  inputs <- findByExtension [".input"] "test/golden"
+  inputs <- findByExtension [".input", ".proto"] "test/golden"
   pure $
     inputs <&> \input ->
       withResource
@@ -49,11 +49,21 @@ test_golden = do
                       Data.ByteString.readFile input
 
                     message <-
-                      case Data.ProtoLens.readMessage @Proto.Protos.Codegen.GenerateRequest (toLazy (decodeUtf8 message)) of
-                        Left errorMessage ->
-                          error (toText errorMessage)
-                        Right message ->
-                          pure message
+                      case takeExtension input of
+                        ".input" ->
+                            case Data.ProtoLens.readMessage @Proto.Protos.Codegen.GenerateRequest (toLazy (decodeUtf8 message)) of
+                              Left errorMessage ->
+                                error (toText errorMessage)
+                              Right message ->
+                                pure message
+                        ".proto" ->
+                            case Data.ProtoLens.decodeMessage @Proto.Protos.Codegen.GenerateRequest message of
+                              Left errorMessage ->
+                                error (toText errorMessage)
+                              Right message ->
+                                pure message
+                        _ ->
+                            error "Impossible: invalid extension"
 
                     (exitCode, stdout, stderr) <-
                       System.Process.ByteString.readProcessWithExitCode

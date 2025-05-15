@@ -531,22 +531,23 @@ sqliteBuiltin column =
 postgresBuiltin :: Proto.Protos.Codegen.Column -> Maybe (NonEmpty HaskellType)
 postgresBuiltin column =
   applyNullable column $
-    asum
-      [ pgType ["serial", "serial4", "pg_catalog.serial4"] "base" "Data.Int.Int32",
-        pgType ["bigserial", "serial8", "pg_catalog.serial8"] "base" "Data.Int.Int64",
-        pgType ["smallserial", "serial2", "pg_catalog.serial2"] "base" "Data.Int.Int16",
-        pgType ["integer", "int", "int4", "pg_catalog.int4"] "base" "Data.Int.Int32",
-        pgType ["bigint", "int8", "pg_catalog.int8"] "base" "Data.Int.Int64",
-        pgType ["smallint", "int2", "pg_catalog.int2"] "base" "Data.Int.Int16",
-        pgType ["float", "double precision", "float8", "pg_catalog.float8"] "ghc-prim" "GHC.Types.Double",
-        pgType ["real", "float4", "pg_catalog.float4"] "ghc-prim" "GHC.Types.Float",
-        pgType ["numeric", "pg_catalog.numeric", "money"] "scientific" "Data.Scientific.Scientific",
-        pgType ["boolean", "bool", "pg_catalog.bool"] "ghc-prim" "GHC.Types.Bool",
-        pgType ["json", "pg_catalog.json"] "aeson" "Data.Aeson.Value",
-        pgType ["jsonb", "pg_catalog.jsonb"] "aeson" "Data.Aeson.Value",
-        pgType ["bytea", "blob", "pg_catalog.bytea"] "bytestring" "Data.ByteString.Short.ShortByteString",
-        pgType ["text", "pg_catalog.varchar", "pg_catalog.bpchar", "string", "citext", "name"] "text" "Data.Text.Text"
-      ]
+    applyArrayLike column $
+      asum
+        [ pgType ["serial", "serial4", "pg_catalog.serial4"] "base" "Data.Int.Int32",
+          pgType ["bigserial", "serial8", "pg_catalog.serial8"] "base" "Data.Int.Int64",
+          pgType ["smallserial", "serial2", "pg_catalog.serial2"] "base" "Data.Int.Int16",
+          pgType ["integer", "int", "int4", "pg_catalog.int4"] "base" "Data.Int.Int32",
+          pgType ["bigint", "int8", "pg_catalog.int8"] "base" "Data.Int.Int64",
+          pgType ["smallint", "int2", "pg_catalog.int2"] "base" "Data.Int.Int16",
+          pgType ["float", "double precision", "float8", "pg_catalog.float8"] "ghc-prim" "GHC.Types.Double",
+          pgType ["real", "float4", "pg_catalog.float4"] "ghc-prim" "GHC.Types.Float",
+          pgType ["numeric", "pg_catalog.numeric", "money"] "scientific" "Data.Scientific.Scientific",
+          pgType ["boolean", "bool", "pg_catalog.bool"] "ghc-prim" "GHC.Types.Bool",
+          pgType ["json", "pg_catalog.json"] "aeson" "Data.Aeson.Value",
+          pgType ["jsonb", "pg_catalog.jsonb"] "aeson" "Data.Aeson.Value",
+          pgType ["bytea", "blob", "pg_catalog.bytea"] "bytestring" "Data.ByteString.Short.ShortByteString",
+          pgType ["text", "pg_catalog.varchar", "pg_catalog.bpchar", "string", "citext", "name"] "text" "Data.Text.Text"
+        ]
   where
     columnType :: Text
     columnType =
@@ -567,6 +568,19 @@ postgresBuiltin column =
                 }
       | otherwise =
           Nothing
+
+    applyArrayLike column haskellTypes
+      | Just (haskellType :| rest) <- haskellTypes,
+        column ^. #isArray =
+          Just
+            ( haskellType
+                { name =
+                    haskellType.name <&> \name ->
+                      "[" <> name <> "]"
+                }
+                :| rest
+            )
+      | otherwise = haskellTypes
 
 -- | Swaps every occurrence of "$x" with ? as that's what the *-simple libraries
 -- understand only.

@@ -6,7 +6,7 @@ import Data.ProtoLens.Labels ()
 import Proto.Protos.Codegen qualified
 import System.Directory qualified
 import System.Exit (ExitCode (..))
-import System.FilePath (takeExtension, dropExtension, (</>))
+import System.FilePath (takeExtension, dropExtension, (</>), replaceExtension)
 import System.IO qualified
 import System.IO.Error qualified
 import System.IO.Temp qualified
@@ -56,12 +56,16 @@ test_golden = do
                                 error (toText errorMessage)
                               Right message ->
                                 pure message
-                        ".proto" ->
-                            case Data.ProtoLens.decodeMessage @Proto.Protos.Codegen.GenerateRequest message of
-                              Left errorMessage ->
-                                error (toText errorMessage)
-                              Right message ->
-                                pure message
+                        ".proto" -> do
+                            message <-
+                              case Data.ProtoLens.decodeMessage @Proto.Protos.Codegen.GenerateRequest message of
+                                Left errorMessage ->
+                                    error (toText errorMessage)
+                                Right message ->
+                                    pure message
+
+                            writeFile (replaceExtension input ".input") (Data.ProtoLens.showMessage message)
+                            pure message
                         _ ->
                             error "Impossible: invalid extension"
 

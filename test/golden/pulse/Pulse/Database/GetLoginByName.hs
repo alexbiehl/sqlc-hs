@@ -9,6 +9,7 @@
 module Pulse.Database.GetLoginByName where
 
 import Pulse.Database.Internal (Query(..), Enum, Params, Result)
+import qualified Database.PostgreSQL.Simple
 import qualified Database.PostgreSQL.Simple.FromRow
 import qualified Database.PostgreSQL.Simple.ToField
 import qualified Database.PostgreSQL.Simple.ToRow
@@ -18,6 +19,7 @@ import qualified Data.Int
 import qualified GHC.Base
 import qualified GHC.Types
 import qualified Data.Time
+import qualified Data.Foldable
 
 query_getLoginByName :: Query "getLoginByName" ":one"
 query_getLoginByName = Query "SELECT id, organization_id, display_name, login_name, password_bcrypt, is_deleted, created_at, updated_at FROM logins WHERE login_name = ? AND NOT is_deleted"

@@ -9,6 +9,7 @@
 module Pulse.Database.GetTeamByName where
 
 import Pulse.Database.Internal (Query(..), Enum, Params, Result)
+import qualified Database.PostgreSQL.Simple
 import qualified Database.PostgreSQL.Simple.FromRow
 import qualified Database.PostgreSQL.Simple.ToField
 import qualified Database.PostgreSQL.Simple.ToRow
@@ -18,6 +19,7 @@ import qualified Data.Text
 import qualified GHC.Types
 import qualified GHC.Base
 import qualified Data.Time
+import qualified Data.Foldable
 
 query_getTeamByName :: Query "getTeamByName" ":one"
 query_getTeamByName = Query "SELECT id, organization_id, display_name, invitation_code, is_deleted, created_at, updated_at FROM teams WHERE organization_id = ? AND display_name = ?"

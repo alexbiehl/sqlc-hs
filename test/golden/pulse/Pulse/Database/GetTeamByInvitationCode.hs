@@ -9,6 +9,7 @@
 module Pulse.Database.GetTeamByInvitationCode where
 
 import Pulse.Database.Internal (Query(..), Enum, Params, Result)
+import qualified Database.PostgreSQL.Simple
 import qualified Database.PostgreSQL.Simple.FromRow
 import qualified Database.PostgreSQL.Simple.ToField
 import qualified Database.PostgreSQL.Simple.ToRow
@@ -18,6 +19,7 @@ import qualified Data.Int
 import qualified GHC.Types
 import qualified GHC.Base
 import qualified Data.Time
+import qualified Data.Foldable
 
 query_getTeamByInvitationCode :: Query "getTeamByInvitationCode" ":one"
 query_getTeamByInvitationCode = Query "SELECT teams.id, organization_id, teams.display_name, invitation_code, is_deleted, teams.created_at, teams.updated_at, organizations.id, organizations.display_name, organizations.created_at, organizations.updated_at FROM teams JOIN organizations ON teams.organization_id = organizations.id WHERE invitation_code = ? AND NOT is_deleted"

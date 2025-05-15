@@ -4,6 +4,7 @@ version: 0.1.0.0
 library
   build-depends:
     base,
+    bytestring,
     mysql-simple,
     text,
   exposed-modules:

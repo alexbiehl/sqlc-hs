@@ -9,11 +9,13 @@
 module Pulse.Database.InsertTeamMember where
 
 import Pulse.Database.Internal (Query(..), Enum, Params, Result)
+import qualified Database.PostgreSQL.Simple
 import qualified Database.PostgreSQL.Simple.FromRow
 import qualified Database.PostgreSQL.Simple.ToField
 import qualified Database.PostgreSQL.Simple.ToRow
 
 import qualified Data.Int
+import qualified Data.Foldable
 
 query_insertTeamMember :: Query "insertTeamMember" ":exec"
 query_insertTeamMember = Query "INSERT INTO team_members (team_id, login_id) VALUES (?, ?) ON CONFLICT (team_id, login_id) DO NOTHING"

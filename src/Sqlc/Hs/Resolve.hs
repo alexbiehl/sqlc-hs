@@ -268,19 +268,21 @@ enumMatcher typeTemplate enums =
   Matcher
     { engine = Nothing,
       matcher = \column ->
-        case find
-          (\enum -> (enum ^. #name) == columnDataType (column ^. #type'))
-          enums of
-          Just enum ->
-            Just $
-              pure
-                typeTemplate
-                  { name =
-                      typeTemplate.module' <&> \module' ->
-                        "(" <> module' <> "." <> "Enum " <> show @Text (enum ^. #name) <> ")"
-                  }
-          Nothing ->
-            Nothing
+        applyNullable column $
+          applyArrayLike column $
+            case find
+              (\enum -> (enum ^. #name) == columnDataType (column ^. #type'))
+              enums of
+              Just enum ->
+                Just $
+                  pure
+                    typeTemplate
+                      { name =
+                          typeTemplate.module' <&> \module' ->
+                            "(" <> module' <> "." <> "Enum " <> show @Text (enum ^. #name) <> ")"
+                      }
+              Nothing ->
+                Nothing
     }
 
 builtins :: [Matcher]
@@ -444,6 +446,20 @@ applyNullable column types
   | otherwise =
       types
 
+applyArrayLike :: Proto.Protos.Codegen.Column -> Maybe (NonEmpty HaskellType) -> Maybe (NonEmpty HaskellType)
+applyArrayLike column haskellTypes
+  | Just (haskellType :| rest) <- haskellTypes,
+    column ^. #isArray || column ^. #isSqlcSlice =
+      Just
+        ( haskellType
+            { name =
+                haskellType.name <&> \name ->
+                  "[" <> name <> "]"
+            }
+            :| rest
+        )
+  | otherwise = haskellTypes
+
 sqliteBuiltin :: Proto.Protos.Codegen.Column -> Maybe (NonEmpty HaskellType)
 sqliteBuiltin column =
   applyNullable column $
@@ -569,24 +585,18 @@ postgresBuiltin column =
       | otherwise =
           Nothing
 
-    applyArrayLike column haskellTypes
-      | Just (haskellType :| rest) <- haskellTypes,
-        column ^. #isArray =
-          Just
-            ( haskellType
-                { name =
-                    haskellType.name <&> \name ->
-                      "[" <> name <> "]"
-                }
-                :| rest
-            )
-      | otherwise = haskellTypes
-
 -- | Swaps every occurrence of "$x" with ? as that's what the *-simple libraries
 -- understand only.
 mangleQuery :: Text -> Text
-mangleQuery query =
-  Data.Text.intercalate "?" $
-    map mangle (Data.Text.splitOn "$" query)
+mangleQuery =
+  unQuestionmark . dollarsToQuestionmark
   where
-    mangle = Data.Text.dropWhile Data.Char.isDigit
+    -- Replace '$x' with '?'
+    dollarsToQuestionmark =
+      Data.Text.intercalate "?"
+        . map (Data.Text.dropWhile Data.Char.isDigit)
+        . Data.Text.splitOn "$"
+
+    -- Replace '(?)' with '?'
+    unQuestionmark =
+      Data.Text.intercalate "?" . Data.Text.splitOn "(?)"

@@ -9,6 +9,7 @@
 module Pulse.Database.GetOrganizations where
 
 import Pulse.Database.Internal (Query(..), Enum, Params, Result)
+import qualified Database.PostgreSQL.Simple
 import qualified Database.PostgreSQL.Simple.FromRow
 import qualified Database.PostgreSQL.Simple.ToField
 import qualified Database.PostgreSQL.Simple.ToRow
@@ -16,6 +17,7 @@ import qualified Database.PostgreSQL.Simple.ToRow
 import qualified Data.Int
 import qualified Data.Text
 import qualified Data.Time
+import qualified Data.Foldable
 
 query_getOrganizations :: Query "getOrganizations" ":many"
 query_getOrganizations = Query "SELECT id, display_name, created_at, updated_at FROM organizations LIMIT 100"

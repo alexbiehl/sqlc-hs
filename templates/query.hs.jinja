@@ -8,18 +8,21 @@
 {-# LANGUAGE TypeFamilies #-}
 module {{moduleName}} where
 
-import {{ internalModuleName }} (Query(..), Enum, Params, Result)
 {% if generatePostgresql %}
+import {{ internalModuleName }} (Query(..), Enum, Params, Result)
+import qualified Database.PostgreSQL.Simple
 import qualified Database.PostgreSQL.Simple.FromRow
 import qualified Database.PostgreSQL.Simple.ToField
 import qualified Database.PostgreSQL.Simple.ToRow
 {% endif %}
 {% if generateSqlite %}
+import {{ internalModuleName }} (Query(..), Enum, Params, Result)
 import qualified Database.SQLite.Simple.FromRow
 import qualified Database.SQLite.Simple.ToField
 import qualified Database.SQLite.Simple.ToRow
 {% endif %}
 {% if generateMysql %}
+import {{ internalModuleName }} (Query(..), Enum, Params, Result)
 import qualified Database.MySQL.Simple.Param
 import qualified Database.MySQL.Simple.QueryParams
 import qualified Database.MySQL.Simple.QueryResults
@@ -51,7 +54,11 @@ data instance Result {{ escapedQueryName }} = {{ haskellResultName }}
 instance Database.PostgreSQL.Simple.ToRow.ToRow (Params {{ escapedQueryName }}) where
   toRow {{ haskellParamsName }}{% if parameterColumns | empty %}{}{% else %}{..}{% endif%} =
     [ {% for param in parameterColumns %}
+      {% if param.value.slice %}
+      Database.PostgreSQL.Simple.ToField.toField (Database.PostgreSQL.Simple.In (Data.Foldable.toList {{ param.value.name }})){% if !param.last %}, {% endif %}
+      {% else %}
       Database.PostgreSQL.Simple.ToField.toField {{ param.value.name }}{% if !param.last %}, {% endif %}
+      {% endif %}
       {% endfor %}
     ]
 

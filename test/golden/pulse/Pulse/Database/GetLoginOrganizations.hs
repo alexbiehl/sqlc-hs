@@ -9,6 +9,7 @@
 module Pulse.Database.GetLoginOrganizations where
 
 import Pulse.Database.Internal (Query(..), Enum, Params, Result)
+import qualified Database.PostgreSQL.Simple
 import qualified Database.PostgreSQL.Simple.FromRow
 import qualified Database.PostgreSQL.Simple.ToField
 import qualified Database.PostgreSQL.Simple.ToRow
@@ -18,6 +19,7 @@ import qualified Data.Text
 import qualified GHC.Base
 import qualified GHC.Types
 import qualified Data.Time
+import qualified Data.Foldable
 
 query_getLoginOrganizations :: Query "getLoginOrganizations" ":many"
 query_getLoginOrganizations = Query "SELECT logins.id, logins.organization_id, logins.display_name, logins.login_name, logins.password_bcrypt, logins.is_deleted, logins.created_at, logins.updated_at, organizations.id, organizations.display_name, organizations.created_at, organizations.updated_at\n  FROM logins\n  JOIN organization_logins ON logins.id = organization_logins.login_id\n  JOIN organizations ON organizations.id = organization_logins.organization_id\n  WHERE\n    logins.id = ? AND NOT logins.is_deleted"

@@ -163,6 +163,7 @@ codegenInternal engine internal = do
         fileName = internal.toHaskellFileName,
         importedTypes =
           [ HaskellType {package = Just "base", module' = Nothing, name = Nothing},
+            HaskellType {package = Just "bytestring", module' = Nothing, name = Nothing},
             HaskellType {package = Just "text", module' = Nothing, name = Nothing}
           ]
             <> dependencies,
@@ -330,6 +331,8 @@ codegenQuery engine internalModule resolveName resolver query = do
       importedTypes =
         foldMap (toList . snd) parameterColumns
           <> foldMap (toList . snd) resultColumns
+          <> [ HaskellType {package = Just "base", module' = Just "Data.Foldable", name = Nothing}
+             ]
 
       -- Modules that the query module needs to import.
       imports :: [Text]
@@ -378,7 +381,11 @@ codegenQuery engine internalModule resolveName resolver query = do
     toParameterColumn (column, haskellType :| _) =
       Text.EDE.fromPairs
         [ "name" Text.EDE..= (resolveName (column ^. #name)).toFieldName column,
-          "type" Text.EDE..= encodeColumnType haskellType
+          "type" Text.EDE..= encodeColumnType haskellType,
+          "slice"
+            Text.EDE..= if column ^. #isSqlcSlice
+              then Just (show @Text ("/*SLICE:" <> column ^. #name <> "*/?"))
+              else Nothing
         ]
 
     toResultColumn (column, haskellType :| _) =

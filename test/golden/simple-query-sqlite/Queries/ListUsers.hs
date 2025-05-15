@@ -15,6 +15,7 @@ import qualified Database.SQLite.Simple.ToRow
 
 import qualified Data.Int
 import qualified Data.Text
+import qualified Data.Foldable
 
 query_ListUsers :: Query "ListUsers" "SELECT"
 query_ListUsers = Query "SELECT * FROM users WHERE ? > 42;"

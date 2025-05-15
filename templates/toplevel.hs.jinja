@@ -1,7 +1,9 @@
 module {{ moduleName }}
   ( module {{ internalModuleName }},
     module {{ typesModuleName }},
+    {% if !(modules | empty) %}
     module Queries
+    {% endif %}
   )
 where
 

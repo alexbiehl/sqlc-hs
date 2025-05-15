@@ -9,6 +9,7 @@
 module Pulse.Database.GetTeamMembers where
 
 import Pulse.Database.Internal (Query(..), Enum, Params, Result)
+import qualified Database.PostgreSQL.Simple
 import qualified Database.PostgreSQL.Simple.FromRow
 import qualified Database.PostgreSQL.Simple.ToField
 import qualified Database.PostgreSQL.Simple.ToRow
@@ -18,6 +19,7 @@ import qualified Data.Text
 import qualified GHC.Base
 import qualified GHC.Types
 import qualified Data.Time
+import qualified Data.Foldable
 
 query_getTeamMembers :: Query "getTeamMembers" ":many"
 query_getTeamMembers = Query "SELECT id, organization_id, display_name, login_name, password_bcrypt, is_deleted, logins.created_at, logins.updated_at, team_id, login_id, team_members.created_at, team_members.updated_at FROM logins JOIN team_members ON logins.id = team_members.login_id WHERE team_id = ?"

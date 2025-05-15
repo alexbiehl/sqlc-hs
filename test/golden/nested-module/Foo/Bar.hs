@@ -1,7 +1,6 @@
 module Foo.Bar
   ( module Foo.Bar.Internal,
     module Foo.Bar.Types,
-    module Queries
   )
 where
 

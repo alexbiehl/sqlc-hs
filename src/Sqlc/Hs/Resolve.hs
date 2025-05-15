@@ -249,15 +249,25 @@ overrideToMatcher :: Override -> Matcher
 overrideToMatcher override =
   Matcher
     { engine = override.engine,
-      matcher
+      matcher = \column -> matchType column
     }
   where
     -- TODO extend the matching to support overriding individual columns
-    matcher column
+    matchType column
+      | not $
+          matchesNullability override.nullable (not (column ^. #notNull)) =
+          -- Do not match on a nullable column if the override doesn't allow it
+          Nothing
       | columnDataType (column ^. #type') == override.databaseType =
           Just (pure override.haskellType)
       | otherwise =
           Nothing
+
+    matchesNullability Nothing _nullable = True
+    matchesNullability (Just True) True = True
+    matchesNullability (Just False) False = True
+    matchesNullability (Just True) False = False
+    matchesNullability (Just False) True = False
 
 enumMatcher ::
   -- | HaskellType pointing to the types module.

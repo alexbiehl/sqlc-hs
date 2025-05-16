@@ -382,6 +382,7 @@ codegenQuery engine internalModule resolveName resolver query = do
       Text.EDE.fromPairs
         [ "name" Text.EDE..= (resolveName (column ^. #name)).toFieldName column,
           "type" Text.EDE..= encodeColumnType haskellType,
+          "notNull" Text.EDE..= (column ^. #notNull),
           "slice"
             Text.EDE..= if column ^. #isSqlcSlice
               then Just (show @Text ("/*SLICE:" <> column ^. #name <> "*/?"))

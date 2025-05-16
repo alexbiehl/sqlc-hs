@@ -55,7 +55,11 @@ instance Database.PostgreSQL.Simple.ToRow.ToRow (Params {{ escapedQueryName }}) 
   toRow {{ haskellParamsName }}{% if parameterColumns | empty %}{}{% else %}{..}{% endif%} =
     [ {% for param in parameterColumns %}
       {% if param.value.slice %}
+      {% if param.value.notNull %}
       Database.PostgreSQL.Simple.ToField.toField (Database.PostgreSQL.Simple.In (Data.Foldable.toList {{ param.value.name }})){% if !param.last %}, {% endif %}
+      {% else %}
+      Database.PostgreSQL.Simple.ToField.toField (fmap (Database.PostgreSQL.Simple.In . Data.Foldable.toList) {{ param.value.name }}){% if !param.last %}, {% endif %}
+      {% endif %}
       {% else %}
       Database.PostgreSQL.Simple.ToField.toField {{ param.value.name }}{% if !param.last %}, {% endif %}
       {% endif %}

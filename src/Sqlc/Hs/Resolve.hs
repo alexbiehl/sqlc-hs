@@ -249,9 +249,23 @@ overrideToMatcher :: Override -> Matcher
 overrideToMatcher override =
   Matcher
     { engine = override.engine,
-      matcher = \column -> matchType column
+      matcher = \column -> wrap $ matchType column
+
     }
   where
+    wrap :: Maybe (NonEmpty HaskellType) -> Maybe (NonEmpty HaskellType)
+    wrap (Just (haskellType :| rest))
+      | Just name <- haskellType.name,
+        Data.Text.elem ' ' name =
+          Just $
+            haskellType
+              { name = Just (Data.Text.singleton '(' <> name <> Data.Text.singleton ')')
+              }
+              :| rest
+    wrap types =
+      types
+
+
     -- TODO extend the matching to support overriding individual columns
     matchType column
       | not $

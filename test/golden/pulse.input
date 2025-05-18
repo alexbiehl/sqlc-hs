@@ -24826,4 +24826,4 @@ queries {
   insert_into_table { name: "teams" }
 }
 sqlc_version: "v1.29.0"
-plugin_options: "{\"cabal_default_extensions\":[\"NoFieldSelectors\"],\"cabal_package_name\":\"pulse-db\",\"haskell_module_prefix\":\"Pulse.Database\",\"overrides\":[{\"db_type\":\"pg_catalog.timestamptz\",\"haskell_type\":{\"module\":\"Data.Time\",\"package\":\"time\",\"type\":\"Data.Time.UTCTime\"}}]}"
+plugin_options: "{\"cabal_default_extensions\":[\"NoFieldSelectors\"],\"cabal_package_name\":\"pulse-db\",\"haskell_module_prefix\":\"Pulse.Database\",\"overrides\":[{\"db_type\":\"pg_catalog.timestamptz\",\"haskell_type\":{\"module\":\"Data.Time\",\"package\":\"time\",\"type\":\"Maybe Data.Time.UTCTime\"}, \"nullable\": true}, {\"db_type\":\"pg_catalog.timestamptz\",\"haskell_type\":{\"module\":\"Data.Time\",\"package\":\"time\",\"type\":\"Data.Time.UTCTime\"}}]}"

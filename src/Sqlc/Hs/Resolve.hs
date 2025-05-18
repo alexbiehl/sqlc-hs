@@ -249,8 +249,10 @@ overrideToMatcher :: Override -> Matcher
 overrideToMatcher override =
   Matcher
     { engine = override.engine,
-      matcher = \column -> wrap $ matchType column
-
+      matcher = \column ->
+        applyArrayLike column $
+          wrap $
+            matchType column
     }
   where
     wrap :: Maybe (NonEmpty HaskellType) -> Maybe (NonEmpty HaskellType)

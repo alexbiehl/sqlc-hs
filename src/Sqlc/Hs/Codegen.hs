@@ -7,6 +7,7 @@ module Sqlc.Hs.Codegen
 where
 
 import Data.FileEmbed qualified
+import Data.List (lookup)
 import Data.ProtoLens.Labels ()
 import Proto.Protos.Codegen qualified
 import Sqlc.Hs.Config (Config (..), HaskellType (..))
@@ -20,6 +21,7 @@ import Sqlc.Hs.Resolve
     mangleQuery,
     newEnumResolver,
     newResolveType,
+    queryParamBindings,
     resolveQueryName,
     resolveType,
   )
@@ -317,10 +319,12 @@ codegenQuery engine internalModule resolveName resolver query = do
   let resolvedName =
         resolveName (query ^. #name)
 
-  parameterColumns <-
+  parameterColumns :: [(Int32, (Proto.Protos.Codegen.Column, NonEmpty HaskellType))] <-
     forM (query ^. #params) $ \parameter -> do
-      whenNothing (resolveType resolver (parameter ^. #column)) $
-        couldNotResolveType (parameter ^. #column)
+      parameterColumn <-
+        whenNothing (resolveType resolver (parameter ^. #column)) $
+          couldNotResolveType (parameter ^. #column)
+      pure (parameter ^. #number, parameterColumn)
 
   resultColumns <-
     forM (query ^. #columns) $ \column -> do
@@ -329,7 +333,7 @@ codegenQuery engine internalModule resolveName resolver query = do
 
   let importedTypes :: [HaskellType]
       importedTypes =
-        foldMap (toList . snd) parameterColumns
+        foldMap (toList . snd . snd) parameterColumns
           <> foldMap (toList . snd) resultColumns
           <> [ HaskellType {package = Just "base", module' = Just "Data.Foldable", name = Nothing}
              ]
@@ -356,7 +360,8 @@ codegenQuery engine internalModule resolveName resolver query = do
             "escapedQueryName" Text.EDE..= show @Text (query ^. #name),
             "escapedCommand" Text.EDE..= show @Text (query ^. #cmd),
             "escapedSql" Text.EDE..= show @Text mangledQuery,
-            "parameterColumns" Text.EDE..= fmap toParameterColumn parameterColumns,
+            "parameterColumns" Text.EDE..= fmap (toParameterColumn . snd) parameterColumns,
+            "queryColumns" Text.EDE..= fmap toParameterColumn (toQueryColumns parameterColumns),
             "resultColumns" Text.EDE..= fmap toResultColumn resultColumns
           ]
 
@@ -370,6 +375,17 @@ codegenQuery engine internalModule resolveName resolver query = do
   where
     mangledQuery =
       mangleQuery (query ^. #text)
+
+    -- It's possible for parametes to appear in a query more than once.
+    -- This function "zips" the occurrences in the query with the actual
+    -- parameters.
+    toQueryColumns :: [(Int32, parameterColumn)] -> [parameterColumn]
+    toQueryColumns parameterColumns =
+      mapMaybe
+        ( \number ->
+            lookup (fromIntegral number) parameterColumns
+        )
+        (queryParamBindings (query ^. #text))
 
     contents context =
       case Text.EDE.render queryTemplate context of

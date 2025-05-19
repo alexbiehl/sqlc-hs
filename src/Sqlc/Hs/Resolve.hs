@@ -13,6 +13,7 @@ module Sqlc.Hs.Resolve
     determineTypesModule,
     -- | Query mangling
     mangleQuery,
+    queryParamBindings,
   )
 where
 
@@ -618,3 +619,10 @@ mangleQuery =
     -- Replace '(?)' with '?'
     unQuestionmark =
       Data.Text.intercalate "?" . Data.Text.splitOn "(?)"
+
+queryParamBindings :: Text -> [Int]
+queryParamBindings query =
+  catMaybes
+    [ readMaybe (toString (Data.Text.takeWhile Data.Char.isDigit x))
+      | x <- Data.Text.splitOn "$" query
+    ]

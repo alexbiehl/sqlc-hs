@@ -53,7 +53,7 @@ data instance Result {{ escapedQueryName }} = {{ haskellResultName }}
 {% if generatePostgresql %}
 instance Database.PostgreSQL.Simple.ToRow.ToRow (Params {{ escapedQueryName }}) where
   toRow {{ haskellParamsName }}{% if parameterColumns | empty %}{}{% else %}{..}{% endif%} =
-    [ {% for param in parameterColumns %}
+    [ {% for param in queryColumns %}
       {% if param.value.slice %}
       {% if param.value.notNull %}
       Database.PostgreSQL.Simple.ToField.toField (Database.PostgreSQL.Simple.In (Data.Foldable.toList {{ param.value.name }})){% if !param.last %}, {% endif %}

@@ -1,5 +1,5 @@
 settings {
-  engine: "mysql"
+  engine: "postgresql"
 }
 
 queries {
@@ -22,7 +22,6 @@ queries {
     }
   }
   params {
-    number: 1
     column {
       name: "age"
       not_null: true
@@ -33,4 +32,4 @@ queries {
   }
 }
 
-global_options: "{ \"cabal_package_name\": \"simple-query-mysql\" }"
+global_options: "{ "overrides": [{  }] }"

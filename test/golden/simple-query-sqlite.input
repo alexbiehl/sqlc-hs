@@ -22,6 +22,7 @@ queries {
     }
   }
   params {
+    number: 1
     column {
       name: "age"
       not_null: true

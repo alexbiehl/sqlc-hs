@@ -1,9 +1,9 @@
 settings {
-  engine: "mysql"
+  engine: "postgresql"
 }
 
 queries {
-  text: "SELECT * FROM users WHERE $1 > 42;"
+  text: "SELECT * FROM users WHERE $1::TEXT IS NULL OR $1::TEXT = users.name ;"
   name: "ListUsers"
   cmd: "SELECT"
   filename: "query/users.sql"
@@ -24,13 +24,13 @@ queries {
   params {
     number: 1
     column {
-      name: "age"
+      name: "name"
       not_null: true
       type {
-        name: "int"
+        name: "text"
       }
     }
   }
 }
 
-global_options: "{ \"cabal_package_name\": \"simple-query-mysql\" }"
+global_options: "{ \"cabal_package_name\": \"simple-query-postgresql\" }"

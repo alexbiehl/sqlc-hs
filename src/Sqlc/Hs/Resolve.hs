@@ -465,19 +465,47 @@ applyNullable column types
   | otherwise =
       types
 
-applyArrayLike :: Proto.Protos.Codegen.Column -> Maybe (NonEmpty HaskellType) -> Maybe (NonEmpty HaskellType)
+applyArrayLike ::
+  Proto.Protos.Codegen.Column ->
+  Maybe (NonEmpty HaskellType) ->
+  Maybe (NonEmpty HaskellType)
 applyArrayLike column haskellTypes
-  | Just (haskellType :| rest) <- haskellTypes,
+  | Just haskellTypes <- haskellTypes,
     column ^. #isArray || column ^. #isSqlcSlice =
-      Just
-        ( haskellType
-            { name =
-                haskellType.name <&> \name ->
-                  "[" <> name <> "]"
-            }
-            :| rest
-        )
+      Just (wrapVector haskellTypes)
   | otherwise = haskellTypes
+
+wrapVector :: NonEmpty HaskellType -> NonEmpty HaskellType
+wrapVector (haskellType :| rest) =
+  haskellType
+    { name =
+        haskellType.name <&> \name ->
+          "Data.Vector.Vector " <> wrapParenthesis name
+    }
+    :| (vectorType : rest)
+  where
+    vectorType =
+      HaskellType
+        { name = Just "Data.Vector.Vector",
+          module' = Just "Data.Vector",
+          package = Just "vector"
+        }
+
+_wrapList :: NonEmpty HaskellType -> NonEmpty HaskellType
+_wrapList (haskellType :| rest) =
+  haskellType
+    { name =
+        haskellType.name <&> \name ->
+          Data.Text.singleton '[' <> name <> Data.Text.singleton ']'
+    }
+    :| rest
+
+wrapParenthesis :: Text -> Text
+wrapParenthesis input
+  | ' ' `Data.Text.elem` input =
+      Data.Text.singleton '(' <> input <> Data.Text.singleton ')'
+  | otherwise =
+      input
 
 sqliteBuiltin :: Proto.Protos.Codegen.Column -> Maybe (NonEmpty HaskellType)
 sqliteBuiltin column =

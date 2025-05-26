@@ -451,7 +451,7 @@ applyNullable column types
             HaskellType
               { package = Nothing,
                 module' = Nothing,
-                name = Just ("(GHC.Base.Maybe " <> fromMaybe "" (head types).name <> ")")
+                name = Just ("(GHC.Base.Maybe " <> maybe "" wrapParenthesis (head types).name <> ")")
               }
               :| head types
               : HaskellType

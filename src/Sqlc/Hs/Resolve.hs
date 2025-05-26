@@ -471,8 +471,11 @@ applyArrayLike ::
   Maybe (NonEmpty HaskellType)
 applyArrayLike column haskellTypes
   | Just haskellTypes <- haskellTypes,
-    column ^. #isArray || column ^. #isSqlcSlice =
+    column ^. #isArray =
       Just (wrapVector haskellTypes)
+  | Just haskellTypes <- haskellTypes,
+    column ^. #isSqlcSlice =
+      Just (wrapList haskellTypes)
   | otherwise = haskellTypes
 
 wrapVector :: NonEmpty HaskellType -> NonEmpty HaskellType
@@ -491,8 +494,8 @@ wrapVector (haskellType :| rest) =
           package = Just "vector"
         }
 
-_wrapList :: NonEmpty HaskellType -> NonEmpty HaskellType
-_wrapList (haskellType :| rest) =
+wrapList :: NonEmpty HaskellType -> NonEmpty HaskellType
+wrapList (haskellType :| rest) =
   haskellType
     { name =
         haskellType.name <&> \name ->

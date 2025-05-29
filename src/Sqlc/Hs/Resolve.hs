@@ -251,23 +251,18 @@ overrideToMatcher override =
   Matcher
     { engine = override.engine,
       matcher = \column ->
-        applyArrayLike column $
-          wrap $
-            matchType column
+        applyArrayLike
+          column
+          (if column ^. #notNull then identity else wrapMaybe)
+          $ wrap
+          $ matchType column
     }
   where
     wrap :: Maybe (NonEmpty HaskellType) -> Maybe (NonEmpty HaskellType)
-    wrap (Just (haskellType :| rest))
-      | Just name <- haskellType.name,
-        Data.Text.elem ' ' name =
-          Just $
-            haskellType
-              { name = Just (Data.Text.singleton '(' <> name <> Data.Text.singleton ')')
-              }
-              :| rest
-    wrap types =
-      types
-
+    wrap haskellTypes =
+      haskellTypes <&> \(haskellType :| haskellTypes) ->
+        haskellType {name = fmap wrapParenthesis haskellType.name}
+          :| haskellTypes
 
     -- TODO extend the matching to support overriding individual columns
     matchType column
@@ -288,7 +283,7 @@ enumMatcher typeTemplate enums =
     { engine = Nothing,
       matcher = \column ->
         applyNullable column $
-          applyArrayLike column $
+          applyArrayLike column identity $
             case find
               (\enum -> (enum ^. #name) == columnDataType (column ^. #type'))
               enums of
@@ -445,34 +440,19 @@ mysqlBuiltin column =
 applyNullable :: Proto.Protos.Codegen.Column -> Maybe (NonEmpty HaskellType) -> Maybe (NonEmpty HaskellType)
 applyNullable column types
   | not (column ^. #notNull) =
-      case types of
-        Just types ->
-          Just $
-            HaskellType
-              { package = Nothing,
-                module' = Nothing,
-                name = Just ("(GHC.Base.Maybe " <> maybe "" wrapParenthesis (head types).name <> ")")
-              }
-              :| head types
-              : HaskellType
-                { package = Just "base",
-                  module' = Just "GHC.Base",
-                  name = Nothing
-                }
-              : tail types
-        Nothing ->
-          Nothing
+      fmap wrapMaybe types
   | otherwise =
       types
 
 applyArrayLike ::
   Proto.Protos.Codegen.Column ->
+  (NonEmpty HaskellType -> NonEmpty HaskellType) ->
   Maybe (NonEmpty HaskellType) ->
   Maybe (NonEmpty HaskellType)
-applyArrayLike column haskellTypes
+applyArrayLike column wrapArrayLike haskellTypes
   | Just haskellTypes <- haskellTypes,
     column ^. #isArray =
-      Just (wrapVector haskellTypes)
+      Just (wrapArrayLike (wrapVector haskellTypes))
   | Just haskellTypes <- haskellTypes,
     column ^. #isSqlcSlice =
       Just (wrapList haskellTypes)
@@ -502,6 +482,23 @@ wrapList (haskellType :| rest) =
           Data.Text.singleton '[' <> name <> Data.Text.singleton ']'
     }
     :| rest
+
+wrapMaybe :: NonEmpty HaskellType -> NonEmpty HaskellType
+wrapMaybe (haskellType :| rest) =
+  HaskellType
+    { package = Nothing,
+      module' = Nothing,
+      name =
+        haskellType.name <&> \name ->
+          "GHC.Base.Maybe " <> wrapParenthesis name
+    }
+    :| haskellType
+    : HaskellType
+      { package = Just "base",
+        module' = Just "GHC.Base",
+        name = Nothing
+      }
+    : rest
 
 wrapParenthesis :: Text -> Text
 wrapParenthesis input
@@ -597,7 +594,7 @@ sqliteBuiltin column =
 postgresBuiltin :: Proto.Protos.Codegen.Column -> Maybe (NonEmpty HaskellType)
 postgresBuiltin column =
   applyNullable column $
-    applyArrayLike column $
+    applyArrayLike column identity $
       asum
         [ pgType ["serial", "serial4", "pg_catalog.serial4"] "base" "Data.Int.Int32",
           pgType ["bigserial", "serial8", "pg_catalog.serial8"] "base" "Data.Int.Int64",

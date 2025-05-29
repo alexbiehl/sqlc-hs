@@ -46,7 +46,7 @@ data instance Params {{ escapedQueryName }} = {{ haskellParamsName }}
 data instance Result {{ escapedQueryName }} = {{ haskellResultName }}
   {
   {% for column in resultColumns  %}
-    {{ column.value.name }} :: !{{ column.value.type }}{% if !column.last %},{% endif %}
+    {{ column.value.name }} :: !({{ column.value.type }}){% if !column.last %},{% endif %}
   {% endfor %}
   }
 

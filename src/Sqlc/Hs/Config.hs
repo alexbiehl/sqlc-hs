@@ -68,7 +68,7 @@ instance FromJSON Config where
       <*> fmap pure (o .:? "overrides" .!= mempty)
 
 data Override = Override
-  { haskellType :: HaskellType,
+  { haskellType :: NonEmpty HaskellType,
     databaseType :: Text,
     -- Fully qualified name of the column, e.g. `accounts.id`
     column :: Maybe Text,
@@ -81,7 +81,12 @@ data Override = Override
 instance FromJSON Override where
   parseJSON = withObject "Override" $ \o ->
     Override
-      <$> o .: "haskell_type"
+      <$> ( -- We allow multiple haskell-types per database type
+            -- to support composite types and their dependencies.
+            fmap pure (o .: "haskell_type")
+              <|> o
+              .: "haskell_type"
+          )
       <*> o .: "db_type"
       <*> o .:? "column"
       <*> o .:? "engine"

@@ -269,7 +269,7 @@ overrideToMatcher override =
       | fromMaybe False override.nullable /= not (column ^. #notNull) =
           Nothing
       | columnDataType (column ^. #type') == override.databaseType =
-          Just (pure override.haskellType)
+          Just override.haskellType
       | otherwise =
           Nothing
 

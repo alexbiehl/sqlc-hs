@@ -116,9 +116,9 @@ data HaskellType = HaskellType
 instance FromJSON HaskellType where
   parseJSON = withObject "HaskellType" $ \o ->
     HaskellType
-      <$> fmap Just (o .: "package")
-      <*> fmap Just (o .: "module")
-      <*> fmap Just (o .: "type")
+      <$> o .:? "package"
+      <*> o .:? "module"
+      <*> o .:? "type"
 
 parseConfig :: ByteString -> Either String Config
 parseConfig input =

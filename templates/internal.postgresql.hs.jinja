@@ -25,6 +25,9 @@ module {{ moduleName }} (
     queryMany,
     fold,
 
+    -- * :copyfrom
+    execMany,
+
     -- * Reexports
     Database.PostgreSQL.Simple.Connection,
     Database.PostgreSQL.Simple.ToRow,
@@ -32,6 +35,7 @@ module {{ moduleName }} (
   ) where
 
 import Data.Foldable (Foldable)
+import qualified Data.Foldable
 import Data.Vector (Vector)
 import Database.PostgreSQL.Simple (Connection, FromRow, ToRow)
 import GHC.TypeLits (Symbol)
@@ -105,6 +109,15 @@ queryMany ::
   IO (Vector (Result name))
 queryMany connection (Query sql) params =
   Database.PostgreSQL.Simple.Vector.query connection sql params
+
+execMany ::
+  (ToRow (Params name), FromRow (Result name), Foldable f) =>
+  Connection ->
+  Query name ":copyfrom" ->
+  f (Params name) ->
+  IO Data.Int.Int64
+execMany connection (Query sql) params =
+  Database.PostgreSQL.Simple.executeMany connection sql (Data.Foldable.toList params)
 
 fold ::
   (ToRow (Params name), FromRow (Result name)) =>

@@ -424,84 +424,36 @@ codegenQuery engine internalModule resolveName resolver query = do
 
 toplevelTemplate :: Text.EDE.Template
 toplevelTemplate =
-  case Text.EDE.parse template of
-    Text.EDE.Success template ->
-      template
-    Text.EDE.Failure errorDoc ->
-      error (show errorDoc)
-  where
-    template :: ByteString
-    template =
-      $(Data.FileEmbed.embedFile "templates/toplevel.hs.jinja")
+  toTemplate $(Data.FileEmbed.embedFile "templates/toplevel.hs.jinja")
 
 queryTemplate :: Text.EDE.Template
 queryTemplate =
-  case Text.EDE.parse template of
-    Text.EDE.Success template ->
-      template
-    Text.EDE.Failure errorDoc ->
-      error (show errorDoc)
-  where
-    template :: ByteString
-    template =
-      $(Data.FileEmbed.embedFile "templates/query.hs.jinja")
+  toTemplate $(Data.FileEmbed.embedFile "templates/query.hs.jinja")
 
 typesTemplate :: Text.EDE.Template
 typesTemplate =
-  case Text.EDE.parse template of
-    Text.EDE.Success template ->
-      template
-    Text.EDE.Failure errorDoc ->
-      error (show errorDoc)
-  where
-    template :: ByteString
-    template =
-      $(Data.FileEmbed.embedFile "templates/types.hs.jinja")
+  toTemplate $(Data.FileEmbed.embedFile "templates/types.hs.jinja")
 
 internalPostgresTemplate :: Text.EDE.Template
 internalPostgresTemplate =
-  case Text.EDE.parse template of
-    Text.EDE.Success template ->
-      template
-    Text.EDE.Failure errorDoc ->
-      error (show errorDoc)
-  where
-    template :: ByteString
-    template =
-      $(Data.FileEmbed.embedFile "templates/internal.postgresql.hs.jinja")
+  toTemplate $(Data.FileEmbed.embedFile "templates/internal.postgresql.hs.jinja")
 
 internalMysqlTemplate :: Text.EDE.Template
 internalMysqlTemplate =
-  case Text.EDE.parse template of
-    Text.EDE.Success template ->
-      template
-    Text.EDE.Failure errorDoc ->
-      error (show errorDoc)
-  where
-    template :: ByteString
-    template =
-      $(Data.FileEmbed.embedFile "templates/internal.mysql.hs.jinja")
+  toTemplate $(Data.FileEmbed.embedFile "templates/internal.mysql.hs.jinja")
 
 internalSqliteTemplate :: Text.EDE.Template
 internalSqliteTemplate =
-  case Text.EDE.parse template of
-    Text.EDE.Success template ->
-      template
-    Text.EDE.Failure errorDoc ->
-      error (show errorDoc)
-  where
-    template :: ByteString
-    template =
-      $(Data.FileEmbed.embedFile "templates/internal.sqlite.hs.jinja")
+  toTemplate $(Data.FileEmbed.embedFile "templates/internal.sqlite.hs.jinja")
 
 cabalTemplate :: Text.EDE.Template
 cabalTemplate =
+  toTemplate $(Data.FileEmbed.embedFile "templates/package.cabal.jinja")
+
+toTemplate :: ByteString -> Text.EDE.Template
+toTemplate template = do
   case Text.EDE.parse template of
     Text.EDE.Success template ->
       template
     Text.EDE.Failure errorDoc ->
       error (show errorDoc)
-  where
-    template :: ByteString
-    template =
-      $(Data.FileEmbed.embedFile "templates/package.cabal.jinja")

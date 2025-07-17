@@ -77,7 +77,7 @@ instance Database.PostgreSQL.Simple.FromRow.FromRow (Result {{ escapedQueryName 
 {% if generateSqlite %}
 instance Database.SQLite.Simple.ToRow.ToRow (Params {{ escapedQueryName }}) where
   toRow {{ haskellParamsName }}{% if parameterColumns | empty %}{}{% else %}{..}{% endif%} =
-    [ {% for param in parameterColumns %}
+    [ {% for param in queryColumns %}
       Database.SQLite.Simple.ToField.toField {{ param.value.name }}{% if !param.last %}, {% endif %}
       {% endfor %}
     ]
@@ -93,7 +93,7 @@ instance Database.SQLite.Simple.FromRow.FromRow (Result {{ escapedQueryName }}) 
 {% if generateMysql %}
 instance Database.MySQL.Simple.QueryParams.QueryParams (Params {{ escapedQueryName }}) where
   renderParams {{ haskellParamsName }}{% if parameterColumns | empty %}{}{% else %}{..}{% endif%} =
-    [ {% for param in parameterColumns %}
+    [ {% for param in queryColumns %}
       Database.MySQL.Simple.Param.render {{ param.value.name }}{% if !param.last %}, {% endif %}
       {% endfor %}
     ]

@@ -31,18 +31,18 @@ data instance Params "getTeamMembers" = Params_getTeamMembers
 
 data instance Result "getTeamMembers" = Result_getTeamMembers
   {
-    logins_id :: !Data.Int.Int32,
-    logins_organization_id :: !Data.Int.Int32,
+    logins_id :: !(Data.Int.Int32),
+    logins_organization_id :: !(Data.Int.Int32),
     logins_display_name :: !(GHC.Base.Maybe Data.Text.Text),
-    logins_login_name :: !Data.Text.Text,
-    logins_password_bcrypt :: !Data.Text.Text,
+    logins_login_name :: !(Data.Text.Text),
+    logins_password_bcrypt :: !(Data.Text.Text),
     logins_is_deleted :: !(GHC.Base.Maybe GHC.Types.Bool),
-    logins_created_at :: !Data.Time.UTCTime,
-    logins_updated_at :: !Data.Time.UTCTime,
-    team_members_team_id :: !Data.Int.Int32,
-    team_members_login_id :: !Data.Int.Int32,
-    team_members_created_at :: !Data.Time.UTCTime,
-    team_members_updated_at :: !Data.Time.UTCTime
+    logins_created_at :: !((Maybe Data.Time.UTCTime)),
+    logins_updated_at :: !((Maybe Data.Time.UTCTime)),
+    team_members_team_id :: !(Data.Int.Int32),
+    team_members_login_id :: !(Data.Int.Int32),
+    team_members_created_at :: !((Maybe Data.Time.UTCTime)),
+    team_members_updated_at :: !((Maybe Data.Time.UTCTime))
   }
 
 instance Database.PostgreSQL.Simple.ToRow.ToRow (Params "getTeamMembers") where

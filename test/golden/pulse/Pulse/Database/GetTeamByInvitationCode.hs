@@ -31,17 +31,17 @@ data instance Params "getTeamByInvitationCode" = Params_getTeamByInvitationCode
 
 data instance Result "getTeamByInvitationCode" = Result_getTeamByInvitationCode
   {
-    teams_id :: !Data.Int.Int32,
-    teams_organization_id :: !Data.Int.Int32,
-    teams_display_name :: !Data.Text.Text,
-    teams_invitation_code :: !Data.Text.Text,
+    teams_id :: !(Data.Int.Int32),
+    teams_organization_id :: !(Data.Int.Int32),
+    teams_display_name :: !(Data.Text.Text),
+    teams_invitation_code :: !(Data.Text.Text),
     teams_is_deleted :: !(GHC.Base.Maybe GHC.Types.Bool),
-    teams_created_at :: !Data.Time.UTCTime,
-    teams_updated_at :: !Data.Time.UTCTime,
-    organizations_id :: !Data.Int.Int32,
-    organizations_display_name :: !Data.Text.Text,
-    organizations_created_at :: !Data.Time.UTCTime,
-    organizations_updated_at :: !Data.Time.UTCTime
+    teams_created_at :: !((Maybe Data.Time.UTCTime)),
+    teams_updated_at :: !((Maybe Data.Time.UTCTime)),
+    organizations_id :: !(Data.Int.Int32),
+    organizations_display_name :: !(Data.Text.Text),
+    organizations_created_at :: !((Maybe Data.Time.UTCTime)),
+    organizations_updated_at :: !((Maybe Data.Time.UTCTime))
   }
 
 instance Database.PostgreSQL.Simple.ToRow.ToRow (Params "getTeamByInvitationCode") where

@@ -14,16 +14,15 @@ import qualified Database.PostgreSQL.Simple.FromRow
 import qualified Database.PostgreSQL.Simple.ToField
 import qualified Database.PostgreSQL.Simple.ToRow
 
-import qualified Data.Text
 import qualified Data.Int
+import qualified Data.Text
 import qualified Data.Foldable
 
 query_ListUsers :: Query "ListUsers" "SELECT"
-query_ListUsers = Query "SELECT * FROM users WHERE name IN ? AND ? > 42;"
+query_ListUsers = Query "SELECT * FROM users WHERE ? > 42;"
 
 data instance Params "ListUsers" = Params_ListUsers
   {
-    names :: [Data.Text.Text],
     age :: Data.Int.Int32
   }
 
@@ -35,11 +34,7 @@ data instance Result "ListUsers" = Result_ListUsers
 
 instance Database.PostgreSQL.Simple.ToRow.ToRow (Params "ListUsers") where
   toRow Params_ListUsers{..} =
-    [ 
-      Database.PostgreSQL.Simple.ToField.toField (Database.PostgreSQL.Simple.In (Data.Foldable.toList names)), 
-
-      Database.PostgreSQL.Simple.ToField.toField age
-    ]
+    [     ]
 
 instance Database.PostgreSQL.Simple.FromRow.FromRow (Result "ListUsers") where
   fromRow =

@@ -1,0 +1,15 @@
+cabal-version: 3.0
+name: queries
+version: 0.1.0.0
+library
+  build-depends:
+    base,
+    bytestring,
+    postgresql-simple,
+    text,
+    vector,
+  exposed-modules:
+    Queries
+    Queries.Internal
+    Queries.ListUsers
+    Queries.Types

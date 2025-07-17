@@ -28,8 +28,8 @@ data instance Params "ListUsers" = Params_ListUsers
 
 data instance Result "ListUsers" = Result_ListUsers
   {
-    id :: !Data.Int.Int32,
-    name :: !Data.Text.Text
+    id :: !(Data.Int.Int32),
+    name :: !(Data.Text.Text)
   }
 
 instance Database.PostgreSQL.Simple.ToRow.ToRow (Params "ListUsers") where

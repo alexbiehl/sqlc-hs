@@ -28,10 +28,10 @@ data instance Params "getOrganizations" = Params_getOrganizations
 
 data instance Result "getOrganizations" = Result_getOrganizations
   {
-    organizations_id :: !Data.Int.Int32,
-    organizations_display_name :: !Data.Text.Text,
-    organizations_created_at :: !Data.Time.UTCTime,
-    organizations_updated_at :: !Data.Time.UTCTime
+    organizations_id :: !(Data.Int.Int32),
+    organizations_display_name :: !(Data.Text.Text),
+    organizations_created_at :: !((Maybe Data.Time.UTCTime)),
+    organizations_updated_at :: !((Maybe Data.Time.UTCTime))
   }
 
 instance Database.PostgreSQL.Simple.ToRow.ToRow (Params "getOrganizations") where

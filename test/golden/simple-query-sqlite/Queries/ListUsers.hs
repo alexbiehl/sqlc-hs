@@ -27,8 +27,8 @@ data instance Params "ListUsers" = Params_ListUsers
 
 data instance Result "ListUsers" = Result_ListUsers
   {
-    id :: !Data.Int.Int64,
-    name :: !Data.Text.Text
+    id :: !(Data.Int.Int64),
+    name :: !(Data.Text.Text)
   }
 
 

@@ -31,14 +31,14 @@ data instance Params "getLoginByName" = Params_getLoginByName
 
 data instance Result "getLoginByName" = Result_getLoginByName
   {
-    logins_id :: !Data.Int.Int32,
-    logins_organization_id :: !Data.Int.Int32,
+    logins_id :: !(Data.Int.Int32),
+    logins_organization_id :: !(Data.Int.Int32),
     logins_display_name :: !(GHC.Base.Maybe Data.Text.Text),
-    logins_login_name :: !Data.Text.Text,
-    logins_password_bcrypt :: !Data.Text.Text,
+    logins_login_name :: !(Data.Text.Text),
+    logins_password_bcrypt :: !(Data.Text.Text),
     logins_is_deleted :: !(GHC.Base.Maybe GHC.Types.Bool),
-    logins_created_at :: !Data.Time.UTCTime,
-    logins_updated_at :: !Data.Time.UTCTime
+    logins_created_at :: !((Maybe Data.Time.UTCTime)),
+    logins_updated_at :: !((Maybe Data.Time.UTCTime))
   }
 
 instance Database.PostgreSQL.Simple.ToRow.ToRow (Params "getLoginByName") where

@@ -645,8 +645,23 @@ mangleQuery =
         . Data.Text.splitOn "$"
 
     -- Replace '(?)' with '?'
+    -- Due to pretty printing and formatting it could look like
+    --
+    --   (
+    --     ?
+    --   )
+    --
     unQuestionmark =
-      Data.Text.intercalate "?" . Data.Text.splitOn "(?)"
+        Data.Text.intercalate "?" . go . Data.Text.splitOn "?"
+      where
+        go [] = []
+        go [x] = [x]
+        go (left : right : rest)
+          | Just left <- Data.Text.stripSuffix "(" (Data.Text.stripEnd left),
+            Just right <- Data.Text.stripPrefix ")" (Data.Text.stripStart right) =
+              go (left : right : rest)
+          | otherwise =
+              left : go (right : rest)
 
 queryParamBindings :: Text -> [Int]
 queryParamBindings query =

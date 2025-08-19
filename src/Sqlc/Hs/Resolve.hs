@@ -608,7 +608,7 @@ postgresBuiltin column =
           pgType ["boolean", "bool", "pg_catalog.bool"] "ghc-prim" "GHC.Types.Bool",
           pgType ["json", "pg_catalog.json"] "aeson" "Data.Aeson.Value",
           pgType ["jsonb", "pg_catalog.jsonb"] "aeson" "Data.Aeson.Value",
-          pgType ["bytea", "blob", "pg_catalog.bytea"] "bytestring" "Data.ByteString.Short.ShortByteString",
+          pgBinary ["bytea", "blob", "pg_catalog.bytea"],
           pgType ["text", "pg_catalog.varchar", "pg_catalog.bpchar", "string", "citext", "name"] "text" "Data.Text.Text"
         ]
   where
@@ -632,6 +632,28 @@ postgresBuiltin column =
       | otherwise =
           Nothing
 
+    pgBinary pgTypes
+      | columnType `elem` pgTypes =
+          Just $
+            HaskellType
+              { package = Nothing,
+                module' = Nothing,
+                name = Just "Database.PostgreSQL.Simple.Binary Data.ByteString.ByteString"
+              }
+              :| [ HaskellType
+                     { package = Just "bytestring",
+                       module' = Just "Data.ByteString",
+                       name = Nothing
+                     },
+                   HaskellType
+                     { package = Just "postgresql-simple",
+                       module' = Just "Database.PostgreSQL.Simple",
+                       name = Nothing
+                     }
+                 ]
+      | otherwise =
+          Nothing
+
 -- | Swaps every occurrence of "$x" with ? as that's what the *-simple libraries
 -- understand only.
 mangleQuery :: Text -> Text
@@ -652,7 +674,7 @@ mangleQuery =
     --   )
     --
     unQuestionmark =
-        Data.Text.intercalate "?" . go . Data.Text.splitOn "?"
+      Data.Text.intercalate "?" . go . Data.Text.splitOn "?"
       where
         go [] = []
         go [x] = [x]

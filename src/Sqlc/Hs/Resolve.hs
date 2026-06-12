@@ -571,9 +571,13 @@ sqliteBuiltin column =
                 }
       ]
   where
+    -- SQLite preserves the column type's casing exactly as written in the DDL
+    -- (e.g. @TEXT@, @Integer@), whereas the builtin matchers above compare
+    -- against lowercase names. Normalise to lowercase so type affinity is
+    -- recognised regardless of how the schema spells the type.
     columnType :: Text
     columnType =
-      columnDataType (column ^. #type')
+      Data.Text.toLower (columnDataType (column ^. #type'))
 
     sqliteType dbType package qualifiedType
       | columnType `elem` dbType =

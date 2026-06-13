@@ -385,7 +385,7 @@ codegenQuery engine internalModule resolveName resolver query = do
         ( \number ->
             lookup (fromIntegral number) parameterColumns
         )
-        (queryParamBindings (query ^. #text))
+        (queryParamBindings engine (query ^. #text))
 
     contents context =
       case Text.EDE.render queryTemplate context of

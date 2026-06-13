@@ -689,9 +689,24 @@ mangleQuery =
           | otherwise =
               left : go (right : rest)
 
-queryParamBindings :: Text -> [Int]
-queryParamBindings query =
-  catMaybes
-    [ readMaybe (toString (Data.Text.takeWhile Data.Char.isDigit x))
-      | x <- Data.Text.splitOn "$" query
-    ]
+-- | The 1-based parameter indices referenced by a query's SQL text, in order.
+--
+-- PostgreSQL uses numbered placeholders (@$1@, @$2@) which may repeat or appear
+-- out of order, so we read the explicit numbers. SQLite uses positional @?@
+-- placeholders with no number; for the @sqlite@ engine we emit sequential
+-- indices @[1..n]@ matching the parameter list order.
+--
+-- The @?@ fallback is deliberately scoped to SQLite: PostgreSQL always uses
+-- @$n@, and the MySQL path is left on the numbered behaviour to avoid changing
+-- it here. Only SQLite needs (and gets) the positional-@?@ handling.
+queryParamBindings :: Text -> Text -> [Int]
+queryParamBindings engine query =
+  case numbered of
+    [] | engine == "sqlite" -> [1 .. Data.Text.count "?" query]
+    bindings -> bindings
+  where
+    numbered =
+      catMaybes
+        [ readMaybe (toString (Data.Text.takeWhile Data.Char.isDigit x))
+          | x <- Data.Text.splitOn "$" query
+        ]

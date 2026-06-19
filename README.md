@@ -18,22 +18,108 @@ plugins:
 Use the plugin for your schemas like so
 
 ```yaml
-  codegen:
-  - out: gen
-    plugin: haskell
-    options:
-      cabal_package_name: your-package
-      cabal_package_version: 0.1.0.0
-      haskell_module_prefix: Database.Queries
-      overrides:
-        db_type: bytea
-        haskell_type:
-          package: bytestring
-          module: Data.ByteString
-          type: Data.ByteString.ByteString
+sql:
+  - engine: postgresql
+    queries: query.sql
+    schema: schema.sql
+    codegen:
+      - out: gen
+        plugin: haskell
+        options:
+          cabal_package_name: your-package
+          cabal_package_version: 0.1.0.0
+          haskell_module_prefix: Database.Queries
+          overrides:
+            - db_type: bytea
+              haskell_type:
+                package: bytestring
+                module: Data.ByteString
+                type: Data.ByteString.ByteString
 ```
 
 Ensure that the sqlc-hs executable is on your PATH when invoking sqlc.
+
+## Overrides
+
+`overrides` is a **list** of mappings — each entry tells sqlc-hs to map a
+database type (or a specific column) to a Haskell type of your choosing. They
+take precedence over the built-in type mappings for the relevant engine.
+
+### Fields
+
+Each override accepts the following keys:
+
+| Key            | Required | Description                                                                                                                                                  |
+| -------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `db_type`      | yes      | The fully qualified database type to match, e.g. `bytea`, `pg_catalog.int4`, `text`. Matched against the column type sqlc reports.                            |
+| `haskell_type` | yes      | The Haskell type to use. Either a single mapping (see below) or a list of mappings — additional entries declare extra package/module dependencies to import. |
+| `column`       | no       | Restrict the override to a specific column, given as `table.column` (e.g. `accounts.id`). When omitted the override applies to every column of `db_type`.    |
+| `engine`       | no       | Restrict the override to a specific engine (`postgresql`, `mysql`, or `sqlite`). Useful when one configuration targets multiple engines.                      |
+| `nullable`     | no       | If `true`, only match columns that are nullable. If `false` or omitted, only match columns that are `NOT NULL`.                                              |
+
+A `haskell_type` mapping has three fields, all of which must be fully
+qualified:
+
+| Key       | Description                                                                  |
+| --------- | ---------------------------------------------------------------------------- |
+| `package` | The cabal package providing the type, e.g. `bytestring`. Added as a dependency in the generated cabal file. |
+| `module`  | The module to import, e.g. `Data.ByteString`.                                |
+| `type`    | The fully qualified type name, e.g. `Data.ByteString.ByteString`. May be a composed type like `Data.Vector.Vector Data.Text.Text`. |
+
+### Examples
+
+Map every `bytea` column to a strict `ByteString`:
+
+```yaml
+overrides:
+  - db_type: bytea
+    haskell_type:
+      package: bytestring
+      module: Data.ByteString
+      type: Data.ByteString.ByteString
+```
+
+Map a single column (`accounts.id`) to a custom `UserId` newtype:
+
+```yaml
+overrides:
+  - db_type: pg_catalog.int8
+    column: accounts.id
+    haskell_type:
+      package: your-package
+      module: Your.Types
+      type: Your.Types.UserId
+```
+
+Apply different mappings depending on the engine:
+
+```yaml
+overrides:
+  - db_type: jsonb
+    engine: postgresql
+    haskell_type:
+      package: aeson
+      module: Data.Aeson
+      type: Data.Aeson.Value
+  - db_type: json
+    engine: mysql
+    haskell_type:
+      package: aeson
+      module: Data.Aeson
+      type: Data.Aeson.Value
+```
+
+Override only nullable columns of a given type:
+
+```yaml
+overrides:
+  - db_type: text
+    nullable: true
+    haskell_type:
+      package: text
+      module: Data.Text
+      type: GHC.Base.Maybe Data.Text.Text
+```
 
 # (Re-)Generate proto files with proto-lens
 

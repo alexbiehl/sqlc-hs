@@ -81,6 +81,7 @@ library
     Sqlc.Hs.Codegen
     Sqlc.Hs.Config
     Sqlc.Hs.Main
+    Sqlc.Hs.NameTemplate
     Sqlc.Hs.Resolve
 
   build-depends:

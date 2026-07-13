@@ -82,6 +82,23 @@ overrides:
       type: Data.ByteString.ByteString
 ```
 
+Give `haskell_type` as a **list** when the type is composed from more than
+one module: the first entry's `type` is what gets rendered, and every
+entry's `package`/`module` is added as a cabal dependency and import. Here a
+custom `x509_certificate` domain maps to `Binary ByteString`, which needs
+both `postgresql-simple` and `bytestring`:
+
+```yaml
+overrides:
+  - db_type: x509_certificate
+    haskell_type:
+      - type: Database.PostgreSQL.Simple.Binary Data.ByteString.ByteString
+      - package: postgresql-simple
+        module: Database.PostgreSQL.Simple
+      - package: bytestring
+        module: Data.ByteString
+```
+
 Map a single column (`accounts.id`) to a custom `UserId` newtype:
 
 ```yaml

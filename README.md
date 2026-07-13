@@ -136,6 +136,68 @@ overrides:
       type: GHC.Base.Maybe Data.Text.Text
 ```
 
+## Naming
+
+`naming` customizes how the names of generated declarations are rendered,
+using mustache-style `{{variable}}` templates. Every key is optional — an
+omitted template falls back to the default, which reproduces sqlc-hs's
+historical naming, so existing configurations keep generating byte-identical
+code.
+
+```yaml
+codegen:
+  - plugin: haskell
+    out: queries
+    options:
+      naming:
+        query: "run{{query}}"
+        params_constructor: "Mk{{query}}Args"
+        result_constructor: "{{query}}Row"
+        enum_constructor: "Enum_{{enum}}_{{value}}"
+        field: "{{column}}_of_{{table}}"
+```
+
+| Key                  | Default                    | Context variables                                                    |
+| -------------------- | -------------------------- | -------------------------------------------------------------------- |
+| `query`              | `query_{{query}}`          | `query` — the query's name                                            |
+| `params_constructor` | `Params_{{query}}`         | `query`                                                               |
+| `result_constructor` | `Result_{{query}}`         | `query`                                                               |
+| `enum_constructor`   | `Enum_{{enum}}_{{value}}`  | `enum` — the database type name; `value` — the enum value             |
+| `field`              | `{{prefix}}{{column}}`     | `column`, `table`, `table_alias`, `schema`, `prefix` (see below)      |
+
+With that configuration, a `ListUsers` query over a `users` table renders as
+
+```haskell
+runListUsers :: Query "ListUsers" "SELECT"
+
+data instance Params "ListUsers" = MkListUsersArgs
+  { age_of_ :: Data.Int.Int32
+  }
+
+data instance Result "ListUsers" = ListUsersRow
+  { id_of_users :: !Data.Int.Int32,
+    name_of_users :: !Data.Text.Text
+  }
+```
+
+instead of the default `query_ListUsers` / `Params_ListUsers` /
+`Result_ListUsers` with `users_id` / `users_name` fields. (Note `age_of_`:
+the parameter has no table, so `{{table}}` rendered empty — see the
+`naming-templates` golden test for the full output.)
+
+`prefix` is the historical field namespacing, precomputed so the default
+template needs no conditionals: the query's table alias (or, failing that,
+the table name) followed by `_` — and empty for table-less outputs such as
+computed/aliased expressions.
+
+Templates support plain `{{variable}}` interpolation only (whitespace inside
+the braces is ignored); unknown variables render as the empty string, like in
+mustache. Rendered names are always fixed up to be valid Haskell identifiers:
+characters that cannot appear in an identifier become `_`, functions and
+fields get a lower-case first letter (or a leading `_` for digits),
+constructors an upper-case one, and Haskell keywords used as field names are
+suffixed with `'`.
+
 # (Re-)Generate proto files with proto-lens
 
 ```

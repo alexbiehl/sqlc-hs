@@ -97,7 +97,7 @@ codegen config generateRequest = do
   pure (cabalPackageFile <> map moduleToFile generatedModules)
   where
     resolveName =
-      resolveQueryName config.haskellModulePrefix
+      resolveQueryName config.naming config.haskellModulePrefix
 
     toplevelName =
       determineTopLevelModule config.haskellModulePrefix

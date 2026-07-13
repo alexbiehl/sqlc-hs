@@ -15,11 +15,13 @@ import qualified Database.PostgreSQL.Simple.ToField
 import qualified Database.PostgreSQL.Simple.ToRow
 
 import qualified Data.Int
+import qualified Data.UUID
 import qualified Data.Text
+import qualified Data.Time
 import qualified Data.Foldable
 
 query_ListUsers :: Query "ListUsers" "SELECT"
-query_ListUsers = Query "SELECT * FROM users WHERE ? > 42;"
+query_ListUsers = Query "SELECT id, name, CAST(created_at AS TEXT) AS created_at FROM users WHERE ? > 42;"
 
 data instance Params "ListUsers" = Params_ListUsers
   {
@@ -28,8 +30,9 @@ data instance Params "ListUsers" = Params_ListUsers
 
 data instance Result "ListUsers" = Result_ListUsers
   {
-    id :: !(Data.Int.Int32),
-    name :: !(Data.Text.Text)
+    users_id :: !(Data.UUID.UUID),
+    users_name :: !(Data.Text.Text),
+    created_at :: !(Data.Time.UTCTime)
   }
 
 instance Database.PostgreSQL.Simple.ToRow.ToRow (Params "ListUsers") where
@@ -39,6 +42,7 @@ instance Database.PostgreSQL.Simple.ToRow.ToRow (Params "ListUsers") where
 instance Database.PostgreSQL.Simple.FromRow.FromRow (Result "ListUsers") where
   fromRow =
     pure Result_ListUsers
+      <*> Database.PostgreSQL.Simple.FromRow.field
       <*> Database.PostgreSQL.Simple.FromRow.field
       <*> Database.PostgreSQL.Simple.FromRow.field
 

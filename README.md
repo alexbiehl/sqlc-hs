@@ -51,11 +51,14 @@ Each override accepts the following keys:
 
 | Key            | Required | Description                                                                                                                                                  |
 | -------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `db_type`      | yes      | The fully qualified database type to match, e.g. `bytea`, `pg_catalog.int4`, `text`. Matched against the column type sqlc reports.                            |
+| `db_type`      | no*      | The fully qualified database type to match, e.g. `bytea`, `pg_catalog.int4`, `text`. Matched against the column type sqlc reports.                            |
 | `haskell_type` | yes      | The Haskell type to use. Either a single mapping (see below) or a list of mappings — additional entries declare extra package/module dependencies to import. |
-| `column`       | no       | Restrict the override to a specific column, given as `table.column` (e.g. `accounts.id`). When omitted the override applies to every column of `db_type`.    |
+| `column`       | no*      | Match a specific column: `column`, `table.column` or `schema.table.column`. The table part matches the table name or its query alias; a bare `column` also matches aliased expression outputs (e.g. `CAST(... AS TEXT) AS created_at`), which carry no table. |
 | `engine`       | no       | Restrict the override to a specific engine (`postgresql`, `mysql`, or `sqlite`). Useful when one configuration targets multiple engines.                      |
 | `nullable`     | no       | If `true`, only match columns that are nullable. If `false` or omitted, only match columns that are `NOT NULL`.                                              |
+
+\* At least one of `db_type` or `column` must be given. When both are given,
+both must match.
 
 A `haskell_type` mapping has three fields, all of which must be fully
 qualified:
@@ -83,12 +86,24 @@ Map a single column (`accounts.id`) to a custom `UserId` newtype:
 
 ```yaml
 overrides:
-  - db_type: pg_catalog.int8
-    column: accounts.id
+  - column: accounts.id
     haskell_type:
       package: your-package
       module: Your.Types
       type: Your.Types.UserId
+```
+
+Type a computed/aliased query output that the engine can only describe as
+`TEXT` — e.g. a normalized timestamp — as a proper `UTCTime` (the runtime
+`FromField`/`FromRow` instances of your driver do the decoding):
+
+```yaml
+overrides:
+  - column: last_error_at
+    haskell_type:
+      package: time
+      module: Data.Time
+      type: Data.Time.UTCTime
 ```
 
 Apply different mappings depending on the engine:

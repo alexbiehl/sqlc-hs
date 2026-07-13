@@ -264,14 +264,49 @@ overrideToMatcher override =
         haskellType {name = fmap wrapParenthesis haskellType.name}
           :| haskellTypes
 
-    -- TODO extend the matching to support overriding individual columns
+    -- Every constraint present on the override must hold: db_type (if given)
+    -- and column (if given). The FromJSON instance guarantees at least one of
+    -- the two is set, so this can never match unconditionally.
     matchType column
       | fromMaybe False override.nullable /= not (column ^. #notNull) =
           Nothing
-      | columnDataType (column ^. #type') == override.databaseType =
+      | matchesDatabaseType column,
+        matchesColumn column =
           Just override.haskellType
       | otherwise =
           Nothing
+
+    matchesDatabaseType column =
+      case override.databaseType of
+        Nothing -> True
+        Just databaseType -> columnDataType (column ^. #type') == databaseType
+
+    matchesColumn column =
+      case override.column of
+        Nothing -> True
+        Just name -> columnMatches name column
+
+-- | Match a column against a possibly qualified override name: @column@,
+-- @table.column@ or @schema.table.column@. The table part matches the table's
+-- name or its query alias. A bare @column@ also matches aliased expression
+-- outputs (e.g. @CAST(... AS TEXT) AS created_at@), which carry no table.
+columnMatches :: Text -> Proto.Protos.Codegen.Column -> Bool
+columnMatches qualified column =
+  case reverse (Data.Text.splitOn "." qualified) of
+    [name] ->
+      nameMatches name
+    [name, table] ->
+      nameMatches name && tableMatches table
+    [name, table, schema] ->
+      nameMatches name && tableMatches table && column ^. #table . #schema == schema
+    _ ->
+      False
+  where
+    nameMatches name =
+      column ^. #name == name
+
+    tableMatches table =
+      column ^. #table . #name == table || column ^. #tableAlias == table
 
 enumMatcher ::
   -- | HaskellType pointing to the types module.

@@ -1,17 +1,16 @@
 cabal-version: 3.0
-name: queries
+name: column-override-sqlite
 version: 0.1.0.0
 library
   build-depends:
     base,
     bytestring,
-    postgresql-simple,
+    sqlite-simple,
     text,
     time,
-    uuid,
     vector,
   exposed-modules:
     Queries
+    Queries.GetLastErrors
     Queries.Internal
-    Queries.ListUsers
     Queries.Types

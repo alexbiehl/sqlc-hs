@@ -1,0 +1,29 @@
+settings {
+  engine: "sqlite"
+}
+
+queries {
+  text: "SELECT provider, CAST(COALESCE(strftime('%Y-%m-%dT%H:%M:%SZ', last_attempt_at), '') AS TEXT) AS last_error_at FROM fetch_state;"
+  name: "GetLastErrors"
+  cmd: ":many"
+  filename: "query/fetch_state.sql"
+  columns {
+    name: "provider"
+    not_null: true
+    table {
+      name: "fetch_state"
+    }
+    type {
+      name: "TEXT"
+    }
+  }
+  columns {
+    name: "last_error_at"
+    not_null: true
+    type {
+      name: "TEXT"
+    }
+  }
+}
+
+global_options: "{ \"cabal_package_name\": \"column-override-sqlite\", \"overrides\": [ { \"column\": \"last_error_at\", \"haskell_type\": { \"package\": \"time\", \"module\": \"Data.Time\", \"type\": \"Data.Time.UTCTime\" } } ] }"

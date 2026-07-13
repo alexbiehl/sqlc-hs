@@ -165,6 +165,26 @@ codegen:
 | `enum_constructor`   | `Enum_{{enum}}_{{value}}`  | `enum` — the database type name; `value` — the enum value             |
 | `field`              | `{{prefix}}{{column}}`     | `column`, `table`, `table_alias`, `schema`, `prefix` (see below)      |
 
+With that configuration, a `ListUsers` query over a `users` table renders as
+
+```haskell
+runListUsers :: Query "ListUsers" "SELECT"
+
+data instance Params "ListUsers" = MkListUsersArgs
+  { age_of_ :: Data.Int.Int32
+  }
+
+data instance Result "ListUsers" = ListUsersRow
+  { id_of_users :: !Data.Int.Int32,
+    name_of_users :: !Data.Text.Text
+  }
+```
+
+instead of the default `query_ListUsers` / `Params_ListUsers` /
+`Result_ListUsers` with `users_id` / `users_name` fields. (Note `age_of_`:
+the parameter has no table, so `{{table}}` rendered empty — see the
+`naming-templates` golden test for the full output.)
+
 `prefix` is the historical field namespacing, precomputed so the default
 template needs no conditionals: the query's table alias (or, failing that,
 the table name) followed by `_` — and empty for table-less outputs such as

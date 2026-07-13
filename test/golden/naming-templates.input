@@ -1,0 +1,48 @@
+settings {
+  engine: "postgresql"
+}
+
+queries {
+  text: "SELECT id, name, CAST(now() AS TEXT) AS fetched_at FROM users WHERE $1 > 42;"
+  name: "ListUsers"
+  cmd: "SELECT"
+  filename: "query/users.sql"
+  columns {
+    name: "id"
+    not_null: true
+    table {
+      name: "users"
+    }
+    type {
+      name: "int"
+    }
+  }
+  columns {
+    name: "name"
+    not_null: true
+    table {
+      name: "users"
+    }
+    type {
+      name: "text"
+    }
+  }
+  columns {
+    name: "fetched_at"
+    not_null: true
+    type {
+      name: "text"
+    }
+  }
+  params {
+    column {
+      name: "age"
+      not_null: true
+      type {
+        name: "int"
+      }
+    }
+  }
+}
+
+global_options: "{ \"cabal_package_name\": \"naming-templates\", \"naming\": { \"query\": \"run{{query}}\", \"params_constructor\": \"Mk{{query}}Args\", \"result_constructor\": \"{{query}}Row\", \"field\": \"{{column}}_of_{{table}}\" } }"

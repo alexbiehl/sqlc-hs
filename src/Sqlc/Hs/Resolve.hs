@@ -23,7 +23,8 @@ import Data.ProtoLens.Labels ()
 import Data.Text qualified
 import Data.Vector (Vector)
 import Proto.Protos.Codegen qualified
-import Sqlc.Hs.Config (Config (..), HaskellType (..), Override (..), defaultConfig)
+import Sqlc.Hs.Config (Config (..), HaskellType (..), Naming (..), Override (..), defaultConfig)
+import Sqlc.Hs.NameTemplate qualified
 import System.FilePath ((<.>))
 
 determineTopLevelModule ::
@@ -32,6 +33,7 @@ determineTopLevelModule ::
   ResolvedNames
 determineTopLevelModule haskellModulePrefix =
   resolveQueryName
+    mempty
     Nothing
     (fromMaybe "Queries" (haskellModulePrefix <|> defaultConfig.haskellModulePrefix))
 
@@ -41,6 +43,7 @@ determineInternalModule ::
   ResolvedNames
 determineInternalModule haskellModulePrefix =
   resolveQueryName
+    mempty
     (haskellModulePrefix <|> defaultConfig.haskellModulePrefix <|> Just "Queries")
     "Internal"
 
@@ -50,6 +53,7 @@ determineTypesModule ::
   ResolvedNames
 determineTypesModule haskellModulePrefix =
   resolveQueryName
+    mempty
     (haskellModulePrefix <|> defaultConfig.haskellModulePrefix <|> Just "Queries")
     "Types"
 
@@ -66,12 +70,14 @@ data ResolvedNames = ResolvedNames
 type ResolveName = Text -> ResolvedNames
 
 resolveQueryName ::
+  -- | Name templates. 'mempty' renders the historical names.
+  Naming ->
   -- | Haskell module prefix. E.g. "Data.Queries".
   Maybe Text ->
   -- | Name to resolve
   Text ->
   ResolvedNames
-resolveQueryName haskellModulePrefix name =
+resolveQueryName naming haskellModulePrefix name =
   ResolvedNames
     { toQueryDeclarationName =
         -- This generates
@@ -79,16 +85,20 @@ resolveQueryName haskellModulePrefix name =
         -- query_GetAuthors :: ...
         --
         -- in the query modules.
-        --
-        -- We could some more sophisticated things to make the query name a valid haskell function
-        -- declaration identifier.
-        "query_" <> sanitizedName,
+        asVariableName $
+          renderName naming.query "query_{{query}}" [("query", name)],
       toParamsConstructorDeclarationName =
-        "Params_" <> sanitizedName,
+        asConstructorName $
+          renderName naming.paramsConstructor "Params_{{query}}" [("query", name)],
       toResultConstructorDeclarationName =
-        "Result_" <> sanitizedName,
+        asConstructorName $
+          renderName naming.resultConstructor "Result_{{query}}" [("query", name)],
       toEnumConstructorName = \typename ->
-        "Enum_" <> sanitizeHaskellIdentifier typename <> "_" <> sanitizedName,
+        asConstructorName $
+          renderName
+            naming.enumConstructor
+            "Enum_{{enum}}_{{value}}"
+            [("enum", typename), ("value", name)],
       toFieldName,
       toHaskellFileName =
         toText $
@@ -114,9 +124,42 @@ resolveQueryName haskellModulePrefix name =
         Nothing ->
           identity
 
-    -- A version of the name suitable for consumption as a Haskell identifier.
-    sanitizedName :: Text
-    sanitizedName = sanitizeHaskellIdentifier name
+    -- Render a name template against its context: the configured template if
+    -- present, the default (historical) template otherwise.
+    renderName :: Maybe Text -> Text -> [(Text, Text)] -> Text
+    renderName template fallback context =
+      Sqlc.Hs.NameTemplate.render context (fromMaybe fallback template)
+
+    -- Rendered names must come out as valid Haskell identifiers regardless of
+    -- the template: sanitize the characters, then fix up the first character
+    -- for the identifier flavour. Both are identities on the names the
+    -- default templates render.
+    asVariableName :: Text -> Text
+    asVariableName rendered =
+      case Data.Text.uncons (sanitizeHaskellIdentifier rendered) of
+        Nothing ->
+          "_"
+        Just (c, rest)
+          | Data.Char.isDigit c ->
+              "_" <> Data.Text.cons c rest
+          | Data.Char.isUpper c ->
+              Data.Char.toLower c `Data.Text.cons` rest
+          | otherwise ->
+              Data.Text.cons c rest
+
+    asConstructorName :: Text -> Text
+    asConstructorName rendered =
+      case Data.Text.uncons (sanitizeHaskellIdentifier rendered) of
+        Nothing ->
+          "C"
+        Just (c, rest)
+          | Data.Char.isLower c ->
+              Data.Char.toUpper c `Data.Text.cons` rest
+          | Data.Char.isUpper c ->
+              Data.Text.cons c rest
+          | otherwise ->
+              -- Digits and underscores cannot start a constructor.
+              "C" <> Data.Text.cons c rest
 
     -- A version of the name suitable for use as a Haskell module name.
     sanitizedModuleName :: Text
@@ -149,7 +192,7 @@ resolveQueryName haskellModulePrefix name =
     toFieldName :: Proto.Protos.Codegen.Column -> Text
     toFieldName column =
       escapeHaskellKeyword $
-        case namespaced name of
+        case rendered of
           name
             | Just (c, _rest) <- Data.Text.uncons name,
               Data.Char.isDigit c ->
@@ -162,13 +205,27 @@ resolveQueryName haskellModulePrefix name =
             | otherwise ->
                 name
       where
-        namespaced x
+        rendered =
+          renderName
+            naming.field
+            "{{prefix}}{{column}}"
+            [ ("column", name),
+              ("table", column ^. #table . #name),
+              ("table_alias", column ^. #tableAlias),
+              ("schema", column ^. #table . #schema),
+              ("prefix", prefix)
+            ]
+
+        -- The historical namespacing, precomputed so the default template
+        -- needs no conditionals: table alias or table name plus "_", empty
+        -- for table-less (expression) outputs.
+        prefix
           | column ^. #tableAlias /= "" =
-              column ^. #tableAlias <> "_" <> x
+              column ^. #tableAlias <> "_"
           | column ^. #table . #name /= "" =
-              column ^. #table . #name <> "_" <> x
+              column ^. #table . #name <> "_"
           | otherwise =
-              x
+              ""
 
     escapeHaskellKeyword x =
       case x of

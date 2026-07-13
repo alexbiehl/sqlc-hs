@@ -2,6 +2,7 @@ module Sqlc.Hs.Config
   ( Config (..),
     Override (..),
     HaskellType (..),
+    Naming (..),
     parseConfig,
     defaultConfig,
   )
@@ -30,7 +31,9 @@ data Config = Config
     haskellModulePrefix :: Maybe Text,
     -- | List of lists of overrides. Nesting is list of allowing cheap
     -- concatenation. No need to create a one big vector.
-    overrides :: [Vector Override]
+    overrides :: [Vector Override],
+    -- | Templates for the names of generated declarations.
+    naming :: Naming
   }
 
 instance Semigroup Config where
@@ -45,7 +48,9 @@ instance Semigroup Config where
         cabalDefaultExtensions =
           config1.cabalDefaultExtensions <> config2.cabalDefaultExtensions,
         overrides =
-          config1.overrides <> config2.overrides
+          config1.overrides <> config2.overrides,
+        naming =
+          config1.naming <> config2.naming
       }
 
 instance Monoid Config where
@@ -55,7 +60,8 @@ instance Monoid Config where
         haskellModulePrefix = Nothing,
         cabalPackageName = Nothing,
         cabalPackageVersion = Nothing,
-        cabalDefaultExtensions = []
+        cabalDefaultExtensions = [],
+        naming = mempty
       }
 
 instance FromJSON Config where
@@ -66,6 +72,64 @@ instance FromJSON Config where
       <*> o .:? "cabal_default_extensions" .!= []
       <*> o .:? "haskell_module_prefix"
       <*> fmap pure (o .:? "overrides" .!= mempty)
+      <*> o .:? "naming" .!= mempty
+
+-- | Mustache-style templates for the names of generated declarations. Every
+-- field is optional; an omitted template falls back to the default that
+-- reproduces sqlc-hs's historical naming, so existing configurations generate
+-- byte-identical code.
+--
+-- See the README for the variables available to each template.
+data Naming = Naming
+  { -- | Query declaration, default @query_{{query}}@. Context: @query@.
+    query :: Maybe Text,
+    -- | Params constructor, default @Params_{{query}}@. Context: @query@.
+    paramsConstructor :: Maybe Text,
+    -- | Result constructor, default @Result_{{query}}@. Context: @query@.
+    resultConstructor :: Maybe Text,
+    -- | Enum value constructor, default @Enum_{{enum}}_{{value}}@. Context:
+    -- @enum@ (the database type name), @value@ (the enum value).
+    enumConstructor :: Maybe Text,
+    -- | Record field, default @{{prefix}}{{column}}@. Context: @column@,
+    -- @table@, @table_alias@, @schema@ and @prefix@ (the historical
+    -- namespacing: the table alias or table name followed by @_@, empty for
+    -- table-less expression outputs).
+    field :: Maybe Text
+  }
+
+instance Semigroup Naming where
+  naming1 <> naming2 =
+    Naming
+      { query =
+          getFirst $ First naming1.query <> First naming2.query,
+        paramsConstructor =
+          getFirst $ First naming1.paramsConstructor <> First naming2.paramsConstructor,
+        resultConstructor =
+          getFirst $ First naming1.resultConstructor <> First naming2.resultConstructor,
+        enumConstructor =
+          getFirst $ First naming1.enumConstructor <> First naming2.enumConstructor,
+        field =
+          getFirst $ First naming1.field <> First naming2.field
+      }
+
+instance Monoid Naming where
+  mempty =
+    Naming
+      { query = Nothing,
+        paramsConstructor = Nothing,
+        resultConstructor = Nothing,
+        enumConstructor = Nothing,
+        field = Nothing
+      }
+
+instance FromJSON Naming where
+  parseJSON = withObject "Naming" $ \o ->
+    Naming
+      <$> o .:? "query"
+      <*> o .:? "params_constructor"
+      <*> o .:? "result_constructor"
+      <*> o .:? "enum_constructor"
+      <*> o .:? "field"
 
 data Override = Override
   { haskellType :: NonEmpty HaskellType,

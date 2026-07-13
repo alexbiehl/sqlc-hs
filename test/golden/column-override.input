@@ -3,19 +3,32 @@ settings {
 }
 
 queries {
-  text: "SELECT * FROM users WHERE $1 > 42;"
+  text: "SELECT id, name, CAST(created_at AS TEXT) AS created_at FROM users WHERE $1 > 42;"
   name: "ListUsers"
   cmd: "SELECT"
   filename: "query/users.sql"
   columns {
     name: "id"
     not_null: true
+    table {
+      name: "users"
+    }
     type {
       name: "int"
     }
   }
   columns {
     name: "name"
+    not_null: true
+    table {
+      name: "users"
+    }
+    type {
+      name: "text"
+    }
+  }
+  columns {
+    name: "created_at"
     not_null: true
     type {
       name: "text"
@@ -32,4 +45,4 @@ queries {
   }
 }
 
-global_options: "{ \"overrides\": [] }"
+global_options: "{ \"overrides\": [ { \"column\": \"users.id\", \"haskell_type\": { \"package\": \"uuid\", \"module\": \"Data.UUID\", \"type\": \"Data.UUID.UUID\" } }, { \"column\": \"created_at\", \"haskell_type\": { \"package\": \"time\", \"module\": \"Data.Time\", \"type\": \"Data.Time.UTCTime\" } } ] }"

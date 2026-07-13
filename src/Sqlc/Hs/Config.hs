@@ -69,8 +69,12 @@ instance FromJSON Config where
 
 data Override = Override
   { haskellType :: NonEmpty HaskellType,
-    databaseType :: Text,
-    -- Fully qualified name of the column, e.g. `accounts.id`
+    -- | Database type to match, e.g. @text@. Optional when 'column' is given.
+    databaseType :: Maybe Text,
+    -- | Column to match: @column@, @table.column@ or @schema.table.column@.
+    -- A bare @column@ also matches aliased expression outputs, which carry no
+    -- table. Optional when 'databaseType' is given; when both are given, both
+    -- must match.
     column :: Maybe Text,
     -- | For global overrides only when two different engines are in use.
     engine :: Maybe Text,
@@ -79,18 +83,22 @@ data Override = Override
   }
 
 instance FromJSON Override where
-  parseJSON = withObject "Override" $ \o ->
-    Override
-      <$> ( -- We allow multiple haskell-types per database type
-            -- to support composite types and their dependencies.
-            fmap pure (o .: "haskell_type")
-              <|> o
-              .: "haskell_type"
-          )
-      <*> o .: "db_type"
-      <*> o .:? "column"
-      <*> o .:? "engine"
-      <*> o .:? "nullable"
+  parseJSON = withObject "Override" $ \o -> do
+    override <-
+      Override
+        <$> ( -- We allow multiple haskell-types per database type
+              -- to support composite types and their dependencies.
+              fmap pure (o .: "haskell_type")
+                <|> o
+                .: "haskell_type"
+            )
+        <*> o .:? "db_type"
+        <*> o .:? "column"
+        <*> o .:? "engine"
+        <*> o .:? "nullable"
+    when (isNothing override.databaseType && isNothing override.column) $
+      fail "override requires at least one of \"db_type\" or \"column\""
+    pure override
 
 -- | A haskell type denotes a fully qualified data type with module
 -- and import and all.

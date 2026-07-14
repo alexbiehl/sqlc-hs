@@ -1,0 +1,38 @@
+# Temporary: verifies the build-wasm job from release.yaml without
+# publishing anything. Remove once the WASM release path is confirmed.
+name: WASM build test
+
+on:
+  push:
+    branches:
+      - ci/wasm-release
+
+jobs:
+  build-wasm:
+    runs-on: ubuntu-22.04
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Build
+      run: |
+        curl https://gitlab.haskell.org/haskell-wasm/ghc-wasm-meta/-/raw/master/bootstrap.sh | sh
+        source ~/.ghc-wasm/env
+
+        # The golden-test optional-packages pull in database bindings
+        # that don't solve for wasm32-wasi, so build from a minimal
+        # project file (this also sidesteps cabal.project.freeze).
+        printf 'packages: .\n' > cabal.project.wasm
+        wasm32-wasi-cabal update hackage.haskell.org,2025-03-30T20:28:13Z
+        wasm32-wasi-cabal build --project-file=cabal.project.wasm --allow-newer exe:sqlc-hs
+        cp $(wasm32-wasi-cabal list-bin --project-file=cabal.project.wasm --allow-newer exe:sqlc-hs) ./sqlc-hs-test.wasm
+        sha256sum ./sqlc-hs-test.wasm
+
+    - name: Upload artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: sqlc-hs-test.wasm
+        path: sqlc-hs-test.wasm

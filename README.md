@@ -22,7 +22,7 @@ version: '2'
 plugins:
   - name: haskell
     wasm:
-      url: https://github.com/alexbiehl/sqlc-hs/releases/download/v0.2.0.0/sqlc-hs-v0.2.0.0.wasm
+      url: https://github.com/alexbiehl/sqlc-hs/releases/download/v0.2.0.1/sqlc-hs-v0.2.0.1.wasm
       sha256: <sha256 of the .wasm file>
 ```
 

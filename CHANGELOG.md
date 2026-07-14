@@ -1,6 +1,6 @@
 # Revision history for sqlc-haskell
 
-## 0.2.0.0 -- 2026-07-14
+## 0.2.0.1 -- 2026-07-14
 
 * Mustache-style naming templates for generated declarations.
 * Per-column type overrides via the `overrides` option.
@@ -11,6 +11,7 @@
 * Fix binding of positional `?` parameters in generated `toRow`
   instances (SQLite).
 * Normalise column types to lowercase before builtin matching (SQLite).
+* PVP-compliant upper bounds on all library dependencies.
 
 ## 0.1.0.0 -- YYYY-mm-dd
 

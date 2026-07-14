@@ -4,8 +4,36 @@ A Haskell code generator plugin for [sqlc](https://github.com/kyleconroy/sqlc), 
 
 It leverages [postgresql-simple](https://hackage.haskell.org/package/postgresql-simple), [mysql-simple](https://hackage.haskell.org/package/mysql-simple), and [sqlite-simple](https://hackage.haskell.org/package/sqlite-simple), generating a thin layer on top of these well-known libraries.
 
-Use below configuation in your sqlc.yaml to use sqlc-hs. Refer to the [sqlc documentation](
-https://docs.sqlc.dev/en/latest/guides/plugins.html) for more information
+## Installation
+
+sqlc-hs can be used as a WASM plugin or as a process plugin. Refer to the
+[sqlc documentation](https://docs.sqlc.dev/en/latest/guides/plugins.html)
+for more information.
+
+### WASM plugin (recommended)
+
+Every [release](https://github.com/alexbiehl/sqlc-hs/releases) ships a
+`sqlc-hs-<version>.wasm` module. sqlc downloads and runs it for you — no
+local installation required. Point your sqlc.yaml at the release asset and
+its sha256:
+
+```yaml
+version: '2'
+plugins:
+  - name: haskell
+    wasm:
+      url: https://github.com/alexbiehl/sqlc-hs/releases/download/v0.2.0.0/sqlc-hs-v0.2.0.0.wasm
+      sha256: <sha256 of the .wasm file>
+```
+
+The release notes of each release contain this snippet with the correct
+sha256 filled in — copy it from there.
+
+### Process plugin
+
+Alternatively, install the `sqlc-hs` executable (e.g. via
+`cabal install sqlc-hs`), ensure it is on your PATH when invoking sqlc, and
+configure it as a process plugin:
 
 ```yaml
 version: '2'
@@ -14,6 +42,8 @@ plugins:
     process:
       cmd: sqlc-hs
 ```
+
+## Usage
 
 Use the plugin for your schemas like so
 
@@ -36,8 +66,6 @@ sql:
                 module: Data.ByteString
                 type: Data.ByteString.ByteString
 ```
-
-Ensure that the sqlc-hs executable is on your PATH when invoking sqlc.
 
 ## Overrides
 

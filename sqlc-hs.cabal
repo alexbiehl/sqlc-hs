@@ -41,7 +41,7 @@ source-repository head
 common stuff
   ghc-options:        -Wall -Wno-name-shadowing
   build-depends:
-    , base                     <5.0
+    , base                     <5
     , sqlc-hs:sqlc-hs-prelude
 
   mixins:
@@ -59,8 +59,8 @@ library sqlc-hs-prelude
   visibility:       private
   exposed-modules:  Sqlc.Hs.Prelude
   build-depends:
-    , base    <5.0
-    , relude
+    , base    <5
+    , relude  <1.3
 
   hs-source-dirs:   sqlc-hs-prelude
   default-language: GHC2021
@@ -71,7 +71,7 @@ library sqlc-hs-protos
     Proto.Protos.Codegen
     Proto.Protos.Codegen_Fields
 
-  build-depends:    proto-lens-runtime
+  build-depends:    proto-lens-runtime <0.8
   hs-source-dirs:   sqlc-hs-protos
   default-language: GHC2021
 
@@ -85,18 +85,18 @@ library
     Sqlc.Hs.Resolve
 
   build-depends:
-    , aeson
-    , bytestring
-    , directory
-    , ede
-    , file-embed
-    , filepath
-    , mtl
-    , proto-lens
-    , proto-lens-runtime
+    , aeson               <2.3
+    , bytestring          <0.13
+    , directory           <1.4
+    , ede                 <0.4
+    , file-embed          <0.1
+    , filepath            <1.6
+    , mtl                 <2.4
+    , proto-lens          <0.8
+    , proto-lens-runtime  <0.8
     , sqlc-hs:sqlc-hs-protos
-    , text
-    , vector
+    , text                <2.2
+    , vector              <0.14
 
   hs-source-dirs:   src
   default-language: GHC2021

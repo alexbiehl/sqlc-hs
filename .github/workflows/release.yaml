@@ -51,7 +51,7 @@ jobs:
 
       - name: Configure & build
         run: |
-          cabal configure -O1 --enable-split-sections
+          printf 'package *\n  split-sections: True\n' > cabal.project.local
           cabal build exe:sqlc-hs
           cabal test
 
@@ -103,7 +103,7 @@ jobs:
         # The golden-test optional-packages pull in database bindings
         # that don't solve for wasm32-wasi, so build from a minimal
         # project file (this also sidesteps cabal.project.freeze).
-        printf 'packages: .\nsplit-sections: True\n' > cabal.project.wasm
+        printf 'packages: .\npackage *\n  split-sections: True\n' > cabal.project.wasm
         wasm32-wasi-cabal update hackage.haskell.org,2026-07-14T12:13:01Z
         wasm32-wasi-cabal build --project-file=cabal.project.wasm --allow-newer exe:sqlc-hs
         cp $(wasm32-wasi-cabal list-bin --project-file=cabal.project.wasm --allow-newer exe:sqlc-hs) "./sqlc-hs-${{ github.ref_name }}.wasm"

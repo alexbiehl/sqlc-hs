@@ -1,0 +1,18 @@
+cabal-version: 3.0
+name: sqlite-arg-placeholders
+version: 0.1.0.0
+library
+  build-depends:
+    base,
+    bytestring,
+    sqlite-simple,
+    text,
+    vector,
+  exposed-modules:
+    Queries
+    Queries.FindUsers
+    Queries.Internal
+    Queries.Types
+  default-extensions:
+    OverloadedStrings
+    StrictData

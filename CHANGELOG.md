@@ -1,5 +1,10 @@
 # Revision history for sqlc-haskell
 
+## Unreleased
+
+* Normalise numbered `?N` placeholders (emitted by sqlc for `sqlc.arg`)
+  to positional `?` so sqlite-simple can parse the query (SQLite).
+
 ## 0.2.0.1 -- 2026-07-14
 
 * Mustache-style naming templates for generated declarations.

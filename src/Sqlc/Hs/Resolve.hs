@@ -754,13 +754,26 @@ postgresBuiltin column =
 -- understand only.
 mangleQuery :: Text -> Text
 mangleQuery =
-  unQuestionmark . dollarsToQuestionmark
+  unQuestionmark . numberedQuestionmarksToQuestionmark . dollarsToQuestionmark
   where
     -- Replace '$x' with '?'
     dollarsToQuestionmark =
       Data.Text.intercalate "?"
         . map (Data.Text.dropWhile Data.Char.isDigit)
         . Data.Text.splitOn "$"
+
+    -- Normalize numbered '?x' placeholders to a bare '?'. sqlc emits these for
+    -- @sqlc.arg@ (e.g. @?1@, @?2@) but sqlite-simple only understands the
+    -- positional '?' and fails to parse the numbered form. Only the digits
+    -- immediately following a '?' are dropped; the text before the first '?'
+    -- is left untouched.
+    numberedQuestionmarksToQuestionmark input =
+      case Data.Text.splitOn "?" input of
+        (x : xs) ->
+          Data.Text.intercalate "?"
+            (x : map (Data.Text.dropWhile Data.Char.isDigit) xs)
+        [] ->
+          input
 
     -- Replace '(?)' with '?'
     -- Due to pretty printing and formatting it could look like
@@ -785,16 +798,21 @@ mangleQuery =
 --
 -- PostgreSQL uses numbered placeholders (@$1@, @$2@) which may repeat or appear
 -- out of order, so we read the explicit numbers. SQLite uses positional @?@
--- placeholders with no number; for the @sqlite@ engine we emit sequential
--- indices @[1..n]@ matching the parameter list order.
+-- placeholders, but sqlc emits numbered @?N@ placeholders for @sqlc.arg@ (which
+-- may likewise repeat or be reordered); when present we read those numbers.
+-- For bare positional @?@ placeholders we fall back to sequential indices
+-- @[1..n]@ matching the parameter list order.
 --
--- The @?@ fallback is deliberately scoped to SQLite: PostgreSQL always uses
+-- The @?@ handling is deliberately scoped to SQLite: PostgreSQL always uses
 -- @$n@, and the MySQL path is left on the numbered behaviour to avoid changing
 -- it here. Only SQLite needs (and gets) the positional-@?@ handling.
 queryParamBindings :: Text -> Text -> [Int]
 queryParamBindings engine query =
   case numbered of
-    [] | engine == "sqlite" -> [1 .. Data.Text.count "?" query]
+    [] | engine == "sqlite" ->
+      case questionmarkNumbered of
+        Just bindings -> bindings
+        Nothing -> [1 .. Data.Text.count "?" query]
     bindings -> bindings
   where
     numbered =
@@ -802,3 +820,19 @@ queryParamBindings engine query =
         [ readMaybe (toString (Data.Text.takeWhile Data.Char.isDigit x))
           | x <- Data.Text.splitOn "$" query
         ]
+
+    -- One segment per '?' occurrence (dropping the text before the first '?').
+    -- If any occurrence carries an explicit number (@?N@), read the numbers,
+    -- using the positional index as a fallback for any bare '?'. If none are
+    -- numbered, return 'Nothing' so the caller uses the sequential default.
+    questionmarkNumbered =
+      case drop 1 (Data.Text.splitOn "?" query) of
+        segments
+          | any (not . Data.Text.null . takeDigits) segments ->
+              Just (zipWith bindingFor [1 ..] segments)
+          | otherwise ->
+              Nothing
+      where
+        takeDigits = Data.Text.takeWhile Data.Char.isDigit
+        bindingFor index segment =
+          fromMaybe index (readMaybe (toString (takeDigits segment)))

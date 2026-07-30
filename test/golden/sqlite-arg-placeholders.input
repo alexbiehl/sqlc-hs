@@ -1,0 +1,46 @@
+settings {
+  engine: "sqlite"
+}
+
+queries {
+  text: "SELECT * FROM users WHERE name = ?1 OR nickname = ?1 OR age > ?2;"
+  name: "FindUsers"
+  cmd: "SELECT"
+  filename: "query/users.sql"
+  columns {
+    name: "id"
+    not_null: true
+    type {
+      name: "int"
+    }
+  }
+  columns {
+    name: "name"
+    not_null: true
+    type {
+      name: "text"
+    }
+  }
+  params {
+    number: 1
+    column {
+      name: "name"
+      not_null: true
+      type {
+        name: "text"
+      }
+    }
+  }
+  params {
+    number: 2
+    column {
+      name: "min_age"
+      not_null: true
+      type {
+        name: "int"
+      }
+    }
+  }
+}
+
+global_options: "{ \"cabal_package_name\": \"sqlite-arg-placeholders\", \"cabal_default_extensions\": [\"OverloadedStrings\", \"StrictData\"] }"

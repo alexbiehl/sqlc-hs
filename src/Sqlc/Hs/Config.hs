@@ -33,7 +33,10 @@ data Config = Config
     -- concatenation. No need to create a one big vector.
     overrides :: [Vector Override],
     -- | Templates for the names of generated declarations.
-    naming :: Naming
+    naming :: Naming,
+    -- | The database library to generate against, e.g. @hasql@. Which drivers
+    -- are available depends on the engine; see 'Sqlc.Hs.Backend.resolveBackend'.
+    driver :: Maybe Text
   }
 
 instance Semigroup Config where
@@ -50,7 +53,9 @@ instance Semigroup Config where
         overrides =
           config1.overrides <> config2.overrides,
         naming =
-          config1.naming <> config2.naming
+          config1.naming <> config2.naming,
+        driver =
+          getFirst $ First config1.driver <> First config2.driver
       }
 
 instance Monoid Config where
@@ -61,7 +66,8 @@ instance Monoid Config where
         cabalPackageName = Nothing,
         cabalPackageVersion = Nothing,
         cabalDefaultExtensions = [],
-        naming = mempty
+        naming = mempty,
+        driver = Nothing
       }
 
 instance FromJSON Config where
@@ -73,6 +79,7 @@ instance FromJSON Config where
       <*> o .:? "haskell_module_prefix"
       <*> fmap pure (o .:? "overrides" .!= mempty)
       <*> o .:? "naming" .!= mempty
+      <*> o .:? "driver"
 
 -- | Mustache-style templates for the names of generated declarations. Every
 -- field is optional; an omitted template falls back to the default that
@@ -143,7 +150,15 @@ data Override = Override
     -- | For global overrides only when two different engines are in use.
     engine :: Maybe Text,
     -- | True if the haskellType should override if the matching type is nullable
-    nullable :: Maybe Bool
+    nullable :: Maybe Bool,
+    -- | Encoder expression to use for matching columns, e.g.
+    -- @Hasql.Encoders.timestamp@. hasql only; must be given together with
+    -- 'hasqlDecoder'. Without them a matched column goes through the generated
+    -- @ToField@/@FromField@ classes.
+    hasqlEncoder :: Maybe Text,
+    -- | Decoder expression to use for matching columns, e.g.
+    -- @Hasql.Decoders.timestamp@. See 'hasqlEncoder'.
+    hasqlDecoder :: Maybe Text
   }
 
 instance FromJSON Override where
@@ -160,8 +175,12 @@ instance FromJSON Override where
         <*> o .:? "column"
         <*> o .:? "engine"
         <*> o .:? "nullable"
+        <*> o .:? "hasql_encoder"
+        <*> o .:? "hasql_decoder"
     when (isNothing override.databaseType && isNothing override.column) $
       fail "override requires at least one of \"db_type\" or \"column\""
+    when (isJust override.hasqlEncoder /= isJust override.hasqlDecoder) $
+      fail "override requires either both or neither of \"hasql_encoder\" and \"hasql_decoder\""
     pure override
 
 -- | A haskell type denotes a fully qualified data type with module
@@ -205,5 +224,6 @@ defaultConfig =
       cabalPackageVersion = Just "0.1.0.0",
       cabalDefaultExtensions = [],
       haskellModulePrefix = Just "Queries",
-      overrides = []
+      overrides = [],
+      driver = Nothing
     }

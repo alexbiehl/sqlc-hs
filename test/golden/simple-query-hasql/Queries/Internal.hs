@@ -1,0 +1,388 @@
+{-# LANGUAGE DataKinds #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE NamedFieldPuns #-}
+{-# LANGUAGE TypeFamilies #-}
+module Queries.Internal (
+    Query(..),
+    Params,
+    Result,
+    Queries.Internal.Enum,
+
+    -- * Codecs
+    ToRow(..),
+    FromRow(..),
+    ToField(..),
+    FromField(..),
+    statement,
+
+    -- * :execResult
+    ExecResult(..),
+    execResult,
+    execResultSession,
+
+    -- * :exec
+    exec,
+    execSession,
+
+    -- * :execrows
+    execRows,
+    execRowsSession,
+
+    -- * :one
+    queryOne,
+    queryOneSession,
+
+    -- * :many
+    queryMany,
+    queryManySession,
+    fold,
+    foldSession,
+
+    -- * :copyfrom
+    execMany,
+    execManySession,
+
+    -- * Reexports
+    Hasql.Connection.Connection,
+    Hasql.Session.Session,
+    Hasql.Errors.SessionError,
+  ) where
+
+import Data.Foldable (Foldable)
+import Data.Vector (Vector)
+import GHC.TypeLits (Symbol)
+import qualified Data.Aeson
+import qualified Data.ByteString
+import qualified Data.Foldable
+import qualified Data.Int
+import qualified Data.Scientific
+import qualified Data.Text
+import qualified Data.Time
+import qualified Data.UUID
+import qualified Data.Vector
+import qualified Hasql.Connection
+import qualified Hasql.Decoders
+import qualified Hasql.Encoders
+import qualified Hasql.Errors
+import qualified Hasql.Pipeline
+import qualified Hasql.Session
+import qualified Hasql.Statement
+
+-- | The SQL of a query, with PostgreSQL's positional @$1@, @$2@ placeholders
+-- left as sqlc emitted them.
+newtype Query (name :: Symbol) (command :: Symbol)
+  = Query Data.Text.Text
+
+data family Params (name :: Symbol)
+
+data family Result (name :: Symbol)
+
+data family Enum (name :: Symbol)
+
+-- | The parameter encoder of a query. hasql has no such class of its own --
+-- encoders are plain values -- so sqlc-hs declares one and generates an
+-- instance per query.
+class ToRow a where
+  toRow :: Hasql.Encoders.Params a
+
+-- | The row decoder of a query's result. The counterpart of 'ToRow'.
+class FromRow a where
+  fromRow :: Hasql.Decoders.Row a
+
+-- | The codec of a single value.
+--
+-- sqlc-hs takes hasql's codec from the SQL type for every column it typed
+-- itself, because hasql checks column types when decoding and @text@, @varchar@
+-- and @bpchar@ need three different decoders. Columns typed through an
+-- @overrides@ entry go through this class instead, so a custom type only needs
+-- an instance here:
+--
+-- @
+-- instance ToField MyId where
+--   toField = Data.Functor.Contravariant.contramap unMyId toField
+-- @
+--
+-- An override can also name the codecs directly, with the @hasql_encoder@ and
+-- @hasql_decoder@ keys, in which case no instance is needed.
+class ToField a where
+  toField :: Hasql.Encoders.Value a
+
+-- | The counterpart of 'ToField'.
+--
+-- @
+-- instance FromField MyId where
+--   fromField = fmap MyId fromField
+-- @
+class FromField a where
+  fromField :: Hasql.Decoders.Value a
+
+instance ToField Bool where
+  toField = Hasql.Encoders.bool
+
+instance ToField Data.Int.Int16 where
+  toField = Hasql.Encoders.int2
+
+instance ToField Data.Int.Int32 where
+  toField = Hasql.Encoders.int4
+
+instance ToField Data.Int.Int64 where
+  toField = Hasql.Encoders.int8
+
+instance ToField Float where
+  toField = Hasql.Encoders.float4
+
+instance ToField Double where
+  toField = Hasql.Encoders.float8
+
+instance ToField Data.Scientific.Scientific where
+  toField = Hasql.Encoders.numeric
+
+instance ToField Char where
+  toField = Hasql.Encoders.char
+
+instance ToField Data.Text.Text where
+  toField = Hasql.Encoders.text
+
+instance ToField Data.ByteString.ByteString where
+  toField = Hasql.Encoders.bytea
+
+instance ToField Data.UUID.UUID where
+  toField = Hasql.Encoders.uuid
+
+instance ToField Data.Time.Day where
+  toField = Hasql.Encoders.date
+
+instance ToField Data.Time.LocalTime where
+  toField = Hasql.Encoders.timestamp
+
+instance ToField Data.Time.UTCTime where
+  toField = Hasql.Encoders.timestamptz
+
+instance ToField Data.Time.TimeOfDay where
+  toField = Hasql.Encoders.time
+
+instance ToField (Data.Time.TimeOfDay, Data.Time.TimeZone) where
+  toField = Hasql.Encoders.timetz
+
+instance ToField Data.Time.DiffTime where
+  toField = Hasql.Encoders.interval
+
+instance ToField Data.Aeson.Value where
+  toField = Hasql.Encoders.jsonb
+
+instance (ToField a) => ToField (Data.Vector.Vector a) where
+  toField = Hasql.Encoders.foldableArray (Hasql.Encoders.nonNullable toField)
+
+instance (ToField a) => ToField [a] where
+  toField = Hasql.Encoders.foldableArray (Hasql.Encoders.nonNullable toField)
+
+instance FromField Bool where
+  fromField = Hasql.Decoders.bool
+
+instance FromField Data.Int.Int16 where
+  fromField = Hasql.Decoders.int2
+
+instance FromField Data.Int.Int32 where
+  fromField = Hasql.Decoders.int4
+
+instance FromField Data.Int.Int64 where
+  fromField = Hasql.Decoders.int8
+
+instance FromField Float where
+  fromField = Hasql.Decoders.float4
+
+instance FromField Double where
+  fromField = Hasql.Decoders.float8
+
+instance FromField Data.Scientific.Scientific where
+  fromField = Hasql.Decoders.numeric
+
+instance FromField Char where
+  fromField = Hasql.Decoders.char
+
+instance FromField Data.Text.Text where
+  fromField = Hasql.Decoders.text
+
+instance FromField Data.ByteString.ByteString where
+  fromField = Hasql.Decoders.bytea
+
+instance FromField Data.UUID.UUID where
+  fromField = Hasql.Decoders.uuid
+
+instance FromField Data.Time.Day where
+  fromField = Hasql.Decoders.date
+
+instance FromField Data.Time.LocalTime where
+  fromField = Hasql.Decoders.timestamp
+
+instance FromField Data.Time.UTCTime where
+  fromField = Hasql.Decoders.timestamptz
+
+instance FromField Data.Time.TimeOfDay where
+  fromField = Hasql.Decoders.time
+
+instance FromField (Data.Time.TimeOfDay, Data.Time.TimeZone) where
+  fromField = Hasql.Decoders.timetz
+
+instance FromField Data.Time.DiffTime where
+  fromField = Hasql.Decoders.interval
+
+instance FromField Data.Aeson.Value where
+  fromField = Hasql.Decoders.jsonb
+
+instance (FromField a) => FromField (Data.Vector.Vector a) where
+  fromField = Hasql.Decoders.vectorArray (Hasql.Decoders.nonNullable fromField)
+
+instance (FromField a) => FromField [a] where
+  fromField = Hasql.Decoders.listArray (Hasql.Decoders.nonNullable fromField)
+
+data ExecResult = ExecResult
+  { rowsAffected :: !Data.Int.Int64
+  }
+
+-- | The statement a query and a result decoder make up. Use it to run a query
+-- inside a 'Hasql.Pipeline.Pipeline'.
+statement ::
+  (ToRow (Params name)) =>
+  Query name command ->
+  Hasql.Decoders.Result result ->
+  Hasql.Statement.Statement (Params name) result
+statement (Query sql) decoder =
+  Hasql.Statement.preparable sql toRow decoder
+
+exec ::
+  (ToRow (Params name)) =>
+  Hasql.Connection.Connection ->
+  Query name ":exec" ->
+  Params name ->
+  IO (Either Hasql.Errors.SessionError ())
+exec connection query params =
+  Hasql.Connection.use connection (execSession query params)
+
+execSession ::
+  (ToRow (Params name)) =>
+  Query name ":exec" ->
+  Params name ->
+  Hasql.Session.Session ()
+execSession query params =
+  Hasql.Session.statement params (statement query Hasql.Decoders.noResult)
+
+execRows ::
+  (ToRow (Params name)) =>
+  Hasql.Connection.Connection ->
+  Query name ":execrows" ->
+  Params name ->
+  IO (Either Hasql.Errors.SessionError Data.Int.Int64)
+execRows connection query params =
+  Hasql.Connection.use connection (execRowsSession query params)
+
+execRowsSession ::
+  (ToRow (Params name)) =>
+  Query name ":execrows" ->
+  Params name ->
+  Hasql.Session.Session Data.Int.Int64
+execRowsSession query params =
+  Hasql.Session.statement params (statement query Hasql.Decoders.rowsAffected)
+
+execResult ::
+  (ToRow (Params name)) =>
+  Hasql.Connection.Connection ->
+  Query name ":execresult" ->
+  Params name ->
+  IO (Either Hasql.Errors.SessionError ExecResult)
+execResult connection query params =
+  Hasql.Connection.use connection (execResultSession query params)
+
+execResultSession ::
+  (ToRow (Params name)) =>
+  Query name ":execresult" ->
+  Params name ->
+  Hasql.Session.Session ExecResult
+execResultSession query params = do
+  rowsAffected <- Hasql.Session.statement params (statement query Hasql.Decoders.rowsAffected)
+  pure ExecResult {
+    rowsAffected
+  }
+
+queryOne ::
+  (ToRow (Params name), FromRow (Result name)) =>
+  Hasql.Connection.Connection ->
+  Query name ":one" ->
+  Params name ->
+  IO (Either Hasql.Errors.SessionError (Maybe (Result name)))
+queryOne connection query params =
+  Hasql.Connection.use connection (queryOneSession query params)
+
+queryOneSession ::
+  (ToRow (Params name), FromRow (Result name)) =>
+  Query name ":one" ->
+  Params name ->
+  Hasql.Session.Session (Maybe (Result name))
+queryOneSession query params =
+  Hasql.Session.statement params (statement query (Hasql.Decoders.rowMaybe fromRow))
+
+queryMany ::
+  (ToRow (Params name), FromRow (Result name)) =>
+  Hasql.Connection.Connection ->
+  Query name ":many" ->
+  Params name ->
+  IO (Either Hasql.Errors.SessionError (Vector (Result name)))
+queryMany connection query params =
+  Hasql.Connection.use connection (queryManySession query params)
+
+queryManySession ::
+  (ToRow (Params name), FromRow (Result name)) =>
+  Query name ":many" ->
+  Params name ->
+  Hasql.Session.Session (Vector (Result name))
+queryManySession query params =
+  Hasql.Session.statement params (statement query (Hasql.Decoders.rowVector fromRow))
+
+-- | Note that hasql folds a result purely, so unlike the postgresql-simple
+-- backend the step function is not in 'IO'.
+fold ::
+  (ToRow (Params name), FromRow (Result name)) =>
+  Hasql.Connection.Connection ->
+  Query name ":many" ->
+  Params name ->
+  a ->
+  (a -> Result name -> a) ->
+  IO (Either Hasql.Errors.SessionError a)
+fold connection query params initial step =
+  Hasql.Connection.use connection (foldSession query params initial step)
+{-# INLINABLE fold #-}
+
+foldSession ::
+  (ToRow (Params name), FromRow (Result name)) =>
+  Query name ":many" ->
+  Params name ->
+  a ->
+  (a -> Result name -> a) ->
+  Hasql.Session.Session a
+foldSession query params initial step =
+  Hasql.Session.statement params (statement query (Hasql.Decoders.foldlRows step initial fromRow))
+{-# INLINABLE foldSession #-}
+
+-- | Runs the query once per set of parameters, pipelined into a single
+-- round trip, and returns the total number of rows affected.
+execMany ::
+  (ToRow (Params name), Foldable f) =>
+  Hasql.Connection.Connection ->
+  Query name ":copyfrom" ->
+  f (Params name) ->
+  IO (Either Hasql.Errors.SessionError Data.Int.Int64)
+execMany connection query params =
+  Hasql.Connection.use connection (execManySession query params)
+
+execManySession ::
+  (ToRow (Params name), Foldable f) =>
+  Query name ":copyfrom" ->
+  f (Params name) ->
+  Hasql.Session.Session Data.Int.Int64
+execManySession query params =
+  Hasql.Session.pipeline
+    (fmap sum (traverse pipelined (Data.Foldable.toList params)))
+  where
+    pipelined param =
+      Hasql.Pipeline.statement param (statement query Hasql.Decoders.rowsAffected)

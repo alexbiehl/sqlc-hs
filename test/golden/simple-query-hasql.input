@@ -1,0 +1,82 @@
+settings {
+  engine: "postgresql"
+}
+
+queries {
+  text: "SELECT * FROM users WHERE $1 > 42;"
+  name: "ListUsers"
+  cmd: ":many"
+  filename: "query/users.sql"
+  columns {
+    name: "id"
+    not_null: true
+    type {
+      name: "int"
+    }
+  }
+  columns {
+    name: "name"
+    not_null: true
+    type {
+      name: "pg_catalog.varchar"
+    }
+  }
+  columns {
+    name: "nickname"
+    type {
+      name: "text"
+    }
+  }
+  columns {
+    name: "initial"
+    not_null: true
+    type {
+      name: "pg_catalog.bpchar"
+    }
+  }
+  columns {
+    name: "is_admin"
+    not_null: true
+    type {
+      name: "bool"
+    }
+  }
+  columns {
+    name: "balance"
+    not_null: true
+    type {
+      name: "numeric"
+    }
+  }
+  columns {
+    name: "ratio"
+    type {
+      name: "pg_catalog.float8"
+    }
+  }
+  columns {
+    name: "meta"
+    not_null: true
+    type {
+      name: "jsonb"
+    }
+  }
+  columns {
+    name: "avatar"
+    type {
+      name: "bytea"
+    }
+  }
+  params {
+    number: 1
+    column {
+      name: "age"
+      not_null: true
+      type {
+        name: "int"
+      }
+    }
+  }
+}
+
+global_options: "{ \"cabal_package_name\": \"simple-query-hasql\", \"driver\": \"hasql\" }"

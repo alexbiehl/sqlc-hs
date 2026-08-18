@@ -10,7 +10,8 @@ import Data.FileEmbed qualified
 import Data.List (lookup)
 import Data.ProtoLens.Labels ()
 import Proto.Protos.Codegen qualified
-import Sqlc.Hs.Config (Config (..), HaskellType (..))
+import Sqlc.Hs.Backend (Backend (..), resolveBackend)
+import Sqlc.Hs.Config (Config (..), HaskellType (..), Override (..))
 import Sqlc.Hs.Resolve
   ( ResolveName,
     ResolveType,
@@ -18,12 +19,16 @@ import Sqlc.Hs.Resolve
     determineInternalModule,
     determineTopLevelModule,
     determineTypesModule,
+    findOverride,
+    hasqlColumnCodec,
     mangleQuery,
+    newBuiltinResolver,
     newEnumResolver,
-    newResolveType,
+    newOverrideResolver,
     queryParamBindings,
     resolveQueryName,
     resolveType,
+    rewriteSlices,
   )
 import System.Exit qualified
 import System.IO qualified
@@ -50,16 +55,26 @@ data Module = Module
 
 codegen :: Config -> Proto.Protos.Codegen.GenerateRequest -> IO [File]
 codegen config generateRequest = do
+  backend <-
+    case resolveBackend engine config.driver of
+      Left errorMessage -> do
+        System.IO.hPutStrLn System.IO.stderr (toString errorMessage)
+        System.Exit.exitWith (System.Exit.ExitFailure 1)
+      Right backend ->
+        pure backend
+
   typesModule <-
     codegenTypes
-      (generateRequest ^. #settings . #engine)
+      backend
       internalName
       typesName
       resolveName
+      (generateRequest ^. #catalog . #defaultSchema)
       (generateRequest ^. #catalog . #schemas)
 
   let resolveType =
-        newResolveType config (generateRequest ^. #settings . #engine)
+        newOverrideResolver config engine
+          <> newBuiltinResolver backend engine
           <> newEnumResolver
             ( HaskellType
                 { module' = Just typesModule.name,
@@ -75,7 +90,9 @@ codegen config generateRequest = do
   modules <-
     traverse
       ( codegenQuery
-          (generateRequest ^. #settings . #engine)
+          backend
+          engine
+          (findOverride config engine)
           internalName
           resolveName
           resolveType
@@ -86,7 +103,7 @@ codegen config generateRequest = do
     codegenToplevel toplevelName internalName typesName modules
 
   internalModule <-
-    codegenInternal (generateRequest ^. #settings . #engine) internalName
+    codegenInternal backend internalName
 
   let generatedModules =
         toplevelModule : typesModule : internalModule : modules
@@ -96,6 +113,9 @@ codegen config generateRequest = do
 
   pure (cabalPackageFile <> map moduleToFile generatedModules)
   where
+    engine =
+      generateRequest ^. #settings . #engine
+
     resolveName =
       resolveQueryName config.naming config.haskellModulePrefix
 
@@ -149,11 +169,11 @@ codegenToplevel toplevel internal types modulesToReexport = do
           error (show errorDoc)
 
 codegenInternal ::
-  Text ->
+  Maybe Backend ->
   -- | ResolvedName of the internal module name
   ResolvedNames ->
   IO Module
-codegenInternal engine internal = do
+codegenInternal backend internal = do
   let context =
         Text.EDE.fromPairs
           [ "moduleName" Text.EDE..= internal.toHaskellModuleName
@@ -173,20 +193,35 @@ codegenInternal engine internal = do
       }
   where
     (template, dependencies) =
-      case engine of
-        "sqlite" ->
+      case backend of
+        Just Sqlite ->
           ( internalSqliteTemplate,
             [ HaskellType {package = Just "sqlite-simple", module' = Just "Database.SQLite.Simple", name = Just "ToRow"},
               HaskellType {package = Just "sqlite-simple", module' = Just "Database.SQLite.Simple", name = Just "FromRow"},
               HaskellType {package = Just "vector", module' = Just "Data.Vector", name = Just "Vector"}
             ]
           )
-        "mysql" ->
+        Just Mysql ->
           ( internalMysqlTemplate,
             [ HaskellType {package = Just "mysql-simple", module' = Just "Database.MySQL.Simple", name = Just "ToRow"},
               HaskellType {package = Just "mysql-simple", module' = Just "Database.MySQL.Simple", name = Just "FromRow"}
             ]
           )
+        Just Hasql ->
+          ( internalHasqlTemplate,
+            -- The ToField/FromField instances the internal module ships cover
+            -- the types the built-in mappings and the common overrides use.
+            -- Every one of these packages is already in hasql's own dependency
+            -- closure, so none of them costs an extra build.
+            [ HaskellType {package = Just "hasql", module' = Just "Hasql.Session", name = Just "Session"},
+              HaskellType {package = Just "aeson", module' = Just "Data.Aeson", name = Just "Value"},
+              HaskellType {package = Just "scientific", module' = Just "Data.Scientific", name = Just "Scientific"},
+              HaskellType {package = Just "time", module' = Just "Data.Time", name = Just "UTCTime"},
+              HaskellType {package = Just "uuid", module' = Just "Data.UUID", name = Just "UUID"},
+              HaskellType {package = Just "vector", module' = Just "Data.Vector", name = Just "Vector"}
+            ]
+          )
+        -- Also the fallback for a request that reported no engine at all.
         _ ->
           ( internalPostgresTemplate,
             [ HaskellType {package = Just "postgresql-simple", module' = Just "Database.PostgreSQL.Simple", name = Just "ToRow"},
@@ -253,26 +288,29 @@ codegenCabalFile config generatedModules
       sort (ordNub config.cabalDefaultExtensions)
 
 codegenTypes ::
-  -- | Engine, if defined
-  Text ->
+  Maybe Backend ->
   -- | ResolvedName of the internal module
   ResolvedNames ->
   -- | ResolvedName of the types module
   ResolvedNames ->
   ResolveName ->
+  -- | The catalog's default schema, if reported
+  Text ->
   [Proto.Protos.Codegen.Schema] ->
   IO Module
-codegenTypes engine internalModule typesModule resolveName schemas = do
+codegenTypes backend internalModule typesModule resolveName defaultSchema schemas = do
   let context =
         Text.EDE.fromPairs
-          [ "generatePostgresql" Text.EDE..= (engine == "postgresql"),
-            "generateSqlite" Text.EDE..= (engine == "sqlite"),
-            "generateMysql" Text.EDE..= (engine == "mysql"),
+          [ "generatePostgresql" Text.EDE..= (backend == Just PostgresqlSimple),
+            "generateHasql" Text.EDE..= (backend == Just Hasql),
+            "generateSqlite" Text.EDE..= (backend == Just Sqlite),
+            "generateMysql" Text.EDE..= (backend == Just Mysql),
             "moduleName" Text.EDE..= typesModule.toHaskellModuleName,
             "internalModuleName" Text.EDE..= internalModule.toHaskellModuleName,
             "enums"
               Text.EDE..= [ Text.EDE.fromPairs
                               [ "escapedEnumName" Text.EDE..= show @Text (enum ^. #name),
+                                "escapedEnumSchema" Text.EDE..= enumSchema (schema ^. #name),
                                 "values"
                                   Text.EDE..= [ Text.EDE.fromPairs
                                                   [ "escapedEnumValue" Text.EDE..= show @Text value,
@@ -297,6 +335,20 @@ codegenTypes engine internalModule typesModule resolveName schemas = do
         contents = contents context
       }
   where
+    -- hasql resolves an enum's OID by name at runtime. An unqualified name is
+    -- looked up through the search path, which is what we want for the default
+    -- schema; anything else has to be qualified.
+    enumSchema :: Text -> Text
+    enumSchema schema
+      | schema == mempty || schema == defaultSchemaName =
+          "Prelude.Nothing"
+      | otherwise =
+          "(Prelude.Just " <> show @Text schema <> ")"
+
+    defaultSchemaName
+      | defaultSchema == mempty = "public"
+      | otherwise = defaultSchema
+
     contents context =
       case Text.EDE.render typesTemplate context of
         Text.EDE.Success output ->
@@ -307,15 +359,18 @@ codegenTypes engine internalModule typesModule resolveName schemas = do
 -- | Generate a file for a single query. This returns the resolved 'HaskellType's so
 -- that we can generate the necessary build-depends for the cabal file.
 codegenQuery ::
+  Maybe Backend ->
   -- | Engine, if defined
   Text ->
+  -- | The override that matched a column, if any. Determines the hasql codec.
+  (Proto.Protos.Codegen.Column -> Maybe Override) ->
   -- | ResolvedName of the internal module name
   ResolvedNames ->
   ResolveName ->
   ResolveType ->
   Proto.Protos.Codegen.Query ->
   IO Module
-codegenQuery engine internalModule resolveName resolver query = do
+codegenQuery backend engine resolveOverride internalModule resolveName resolver query = do
   let resolvedName =
         resolveName (query ^. #name)
 
@@ -331,12 +386,37 @@ codegenQuery engine internalModule resolveName resolver query = do
       whenNothing (resolveType resolver column) $
         couldNotResolveType column
 
+  sql <-
+    case backend of
+      -- hasql speaks PostgreSQL's own numbered placeholders, so the SQL is
+      -- passed through as sqlc emitted it. Slices are the exception: they
+      -- become a single array parameter and need the array operators.
+      Just Hasql ->
+        case rewriteSlices (sliceNumbers parameterColumns) (query ^. #text) of
+          Left errorMessage -> do
+            System.IO.hPutStrLn System.IO.stderr $
+              "In query "
+                <> show (query ^. #name)
+                <> ": "
+                <> toString errorMessage
+            System.Exit.exitWith (System.Exit.ExitFailure 1)
+          Right sql ->
+            pure sql
+      _ ->
+        pure (mangleQuery (query ^. #text))
+
   let importedTypes :: [HaskellType]
       importedTypes =
         foldMap (toList . snd . snd) parameterColumns
           <> foldMap (toList . snd) resultColumns
           <> [ HaskellType {package = Just "base", module' = Just "Data.Foldable", name = Nothing}
              ]
+          <> case backend of
+            -- The parameter encoders are assembled contravariantly.
+            Just Hasql ->
+              [HaskellType {package = Just "base", module' = Just "Data.Functor.Contravariant", name = Nothing}]
+            _ ->
+              []
 
       -- Modules that the query module needs to import.
       imports :: [Text]
@@ -346,9 +426,10 @@ codegenQuery engine internalModule resolveName resolver query = do
 
       context =
         Text.EDE.fromPairs
-          [ "generatePostgresql" Text.EDE..= (engine == "postgresql"),
-            "generateSqlite" Text.EDE..= (engine == "sqlite"),
-            "generateMysql" Text.EDE..= (engine == "mysql"),
+          [ "generatePostgresql" Text.EDE..= (backend == Just PostgresqlSimple),
+            "generateHasql" Text.EDE..= (backend == Just Hasql),
+            "generateSqlite" Text.EDE..= (backend == Just Sqlite),
+            "generateMysql" Text.EDE..= (backend == Just Mysql),
             "sourceFile" Text.EDE..= (query ^. #filename),
             "moduleName" Text.EDE..= resolvedName.toHaskellModuleName,
             "moduleImports" Text.EDE..= imports,
@@ -359,9 +440,10 @@ codegenQuery engine internalModule resolveName resolver query = do
             "haskellResultName" Text.EDE..= resolvedName.toResultConstructorDeclarationName,
             "escapedQueryName" Text.EDE..= show @Text (query ^. #name),
             "escapedCommand" Text.EDE..= show @Text (query ^. #cmd),
-            "escapedSql" Text.EDE..= show @Text mangledQuery,
+            "escapedSql" Text.EDE..= show @Text sql,
             "parameterColumns" Text.EDE..= fmap (toParameterColumn . snd) parameterColumns,
             "queryColumns" Text.EDE..= fmap toParameterColumn (toQueryColumns parameterColumns),
+            "encoderColumns" Text.EDE..= fmap (toParameterColumn . snd) (sortOn fst parameterColumns),
             "resultColumns" Text.EDE..= fmap toResultColumn resultColumns
           ]
 
@@ -373,8 +455,11 @@ codegenQuery engine internalModule resolveName resolver query = do
         contents = contents context
       }
   where
-    mangledQuery =
-      mangleQuery (query ^. #text)
+    sliceNumbers parameterColumns =
+      [ fromIntegral number
+        | (number, (column, _haskellTypes)) <- parameterColumns,
+          column ^. #isSqlcSlice
+      ]
 
     -- It's possible for parametes to appear in a query more than once.
     -- This function "zips" the occurrences in the query with the actual
@@ -399,6 +484,7 @@ codegenQuery engine internalModule resolveName resolver query = do
         [ "name" Text.EDE..= (resolveName (column ^. #name)).toFieldName column,
           "type" Text.EDE..= encodeColumnType haskellType,
           "notNull" Text.EDE..= (column ^. #notNull),
+          "encoder" Text.EDE..= fst (hasqlCodec column),
           "slice"
             Text.EDE..= if column ^. #isSqlcSlice
               then Just (show @Text ("/*SLICE:" <> column ^. #name <> "*/?"))
@@ -408,8 +494,15 @@ codegenQuery engine internalModule resolveName resolver query = do
     toResultColumn (column, haskellType :| _) =
       Text.EDE.fromPairs
         [ "name" Text.EDE..= (resolveName (column ^. #name)).toFieldName column,
-          "type" Text.EDE..= encodeColumnType haskellType
+          "type" Text.EDE..= encodeColumnType haskellType,
+          "decoder" Text.EDE..= snd (hasqlCodec column)
         ]
+
+    -- Only the hasql templates read the "encoder" and "decoder" fields.
+    hasqlCodec column =
+      case backend of
+        Just Hasql -> hasqlColumnCodec (resolveOverride column) column
+        _ -> (mempty, mempty)
 
     encodeColumnType haskellType =
       haskellType.name
@@ -445,6 +538,10 @@ internalMysqlTemplate =
 internalSqliteTemplate :: Text.EDE.Template
 internalSqliteTemplate =
   toTemplate $(Data.FileEmbed.embedFile "templates/internal.sqlite.hs.jinja")
+
+internalHasqlTemplate :: Text.EDE.Template
+internalHasqlTemplate =
+  toTemplate $(Data.FileEmbed.embedFile "templates/internal.hasql.hs.jinja")
 
 cabalTemplate :: Text.EDE.Template
 cabalTemplate =

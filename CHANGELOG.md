@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+* A hasql backend for PostgreSQL, selected with the new `driver` option
+  (`driver: hasql`). The default stays `postgresql-simple`, so existing
+  configurations generate the same code as before. Requires hasql >= 1.10.
+  The generated internal module declares the `ToRow`/`FromRow` and
+  `ToField`/`FromField` classes hasql does not ship, and overrides can name
+  their codecs with the new `hasql_encoder` and `hasql_decoder` keys.
 * Normalise numbered `?N` placeholders (emitted by sqlc for `sqlc.arg`)
   to positional `?` so sqlite-simple can parse the query (SQLite).
 

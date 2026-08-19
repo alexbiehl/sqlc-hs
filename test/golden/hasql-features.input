@@ -1,0 +1,212 @@
+settings {
+  engine: "postgresql"
+}
+
+catalog {
+  default_schema: "public"
+  schemas {
+    name: "public"
+    enums {
+      name: "organization_role"
+      vals: "owner"
+      vals: "admin"
+      vals: "member"
+    }
+  }
+}
+
+queries {
+  text: "SELECT id FROM users WHERE $1::TEXT IS NULL OR $1::TEXT = users.name;"
+  name: "FindUserByName"
+  cmd: ":many"
+  filename: "query/users.sql"
+  columns {
+    name: "id"
+    not_null: true
+    type {
+      name: "int"
+    }
+  }
+  params {
+    number: 1
+    column {
+      name: "name"
+      not_null: true
+      type {
+        name: "text"
+      }
+    }
+  }
+}
+
+queries {
+  text: "SELECT id FROM users WHERE name IN ($1) AND email NOT IN ($2) AND age > $3;"
+  name: "FindUsers"
+  cmd: ":many"
+  filename: "query/users.sql"
+  columns {
+    name: "id"
+    not_null: true
+    type {
+      name: "int"
+    }
+  }
+  params {
+    number: 1
+    column {
+      name: "names"
+      not_null: true
+      is_sqlc_slice: true
+      type {
+        name: "text"
+      }
+    }
+  }
+  params {
+    number: 2
+    column {
+      name: "emails"
+      not_null: true
+      is_sqlc_slice: true
+      type {
+        name: "text"
+      }
+    }
+  }
+  params {
+    number: 3
+    column {
+      name: "age"
+      not_null: true
+      type {
+        name: "int"
+      }
+    }
+  }
+}
+
+queries {
+  text: "SELECT tags, labels FROM posts WHERE tags && $1;"
+  name: "FindPosts"
+  cmd: ":many"
+  filename: "query/posts.sql"
+  columns {
+    name: "tags"
+    not_null: true
+    is_array: true
+    type {
+      name: "text"
+    }
+  }
+  columns {
+    name: "labels"
+    is_array: true
+    type {
+      name: "pg_catalog.varchar"
+    }
+  }
+  params {
+    number: 1
+    column {
+      name: "tags"
+      not_null: true
+      is_array: true
+      type {
+        name: "text"
+      }
+    }
+  }
+}
+
+queries {
+  text: "SELECT role, previous_role FROM members WHERE role = $1;"
+  name: "FindMembers"
+  cmd: ":many"
+  filename: "query/members.sql"
+  columns {
+    name: "role"
+    not_null: true
+    type {
+      name: "organization_role"
+    }
+  }
+  columns {
+    name: "previous_role"
+    type {
+      name: "organization_role"
+    }
+  }
+  params {
+    number: 1
+    column {
+      name: "role"
+      not_null: true
+      type {
+        name: "organization_role"
+      }
+    }
+  }
+}
+
+queries {
+  text: "SELECT id, created_at, updated_at, legacy_at FROM events WHERE id = $1 AND legacy_at > $2;"
+  name: "GetEvent"
+  cmd: ":one"
+  filename: "query/events.sql"
+  columns {
+    name: "id"
+    not_null: true
+    type {
+      name: "uuid"
+    }
+  }
+  columns {
+    name: "created_at"
+    not_null: true
+    type {
+      name: "pg_catalog.timestamptz"
+    }
+  }
+  columns {
+    name: "updated_at"
+    type {
+      name: "pg_catalog.timestamptz"
+    }
+  }
+  columns {
+    name: "legacy_at"
+    not_null: true
+    type {
+      name: "pg_catalog.timestamp"
+    }
+  }
+  params {
+    number: 1
+    column {
+      name: "id"
+      not_null: true
+      type {
+        name: "uuid"
+      }
+    }
+  }
+  params {
+    number: 2
+    column {
+      name: "since"
+      not_null: true
+      type {
+        name: "pg_catalog.timestamp"
+      }
+    }
+  }
+}
+
+queries {
+  text: "DELETE FROM users;"
+  name: "DeleteUsers"
+  cmd: ":exec"
+  filename: "query/users.sql"
+}
+
+plugin_options: "{\"cabal_package_name\":\"hasql-features\",\"driver\":\"hasql\",\"overrides\":[{\"db_type\":\"pg_catalog.timestamptz\",\"haskell_type\":{\"package\":\"time\",\"module\":\"Data.Time\",\"type\":\"Data.Time.UTCTime\"}},{\"db_type\":\"pg_catalog.timestamptz\",\"nullable\":true,\"haskell_type\":{\"package\":\"time\",\"module\":\"Data.Time\",\"type\":\"Maybe Data.Time.UTCTime\"}},{\"db_type\":\"uuid\",\"haskell_type\":{\"package\":\"uuid\",\"module\":\"Data.UUID\",\"type\":\"Data.UUID.UUID\"}},{\"db_type\":\"pg_catalog.timestamp\",\"haskell_type\":{\"package\":\"time\",\"module\":\"Data.Time\",\"type\":\"Data.Time.UTCTime\"},\"hasql_encoder\":\"Data.Functor.Contravariant.contramap (Data.Time.utcToLocalTime Data.Time.utc) Hasql.Encoders.timestamp\",\"hasql_decoder\":\"fmap (Data.Time.localTimeToUTC Data.Time.utc) Hasql.Decoders.timestamp\"}]}"

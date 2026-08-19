@@ -16,13 +16,14 @@ synopsis:
 
 description:
   A Haskell code generator plugin for sqlc, allowing you to generate idiomatic Haskell types and functions directly from your SQL queries.
-  It leverages postgresql-simple, mysql-simple, and sqlite-simple, generating a thin layer on top of these well-known libraries.
+  It leverages postgresql-simple, hasql, mysql-simple, and sqlite-simple, generating a thin layer on top of these well-known libraries.
 
 -- copyright:
 build-type:         Simple
 extra-doc-files:    CHANGELOG.md
 extra-source-files:
   README.md
+  templates/internal.hasql.hs.jinja
   templates/internal.mysql.hs.jinja
   templates/internal.postgresql.hs.jinja
   templates/internal.sqlite.hs.jinja
@@ -78,6 +79,7 @@ library sqlc-hs-protos
 library
   import:           stuff
   exposed-modules:
+    Sqlc.Hs.Backend
     Sqlc.Hs.Codegen
     Sqlc.Hs.Config
     Sqlc.Hs.Main

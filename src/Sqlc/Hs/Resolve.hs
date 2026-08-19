@@ -1,8 +1,10 @@
 module Sqlc.Hs.Resolve
   ( ResolveType,
     resolveType,
-    newResolveType,
+    newOverrideResolver,
+    newBuiltinResolver,
     newEnumResolver,
+    findOverride,
     -- | How to resolve names to Haskell modules and files
     ResolveName,
     ResolvedNames (..),
@@ -14,6 +16,9 @@ module Sqlc.Hs.Resolve
     -- | Query mangling
     mangleQuery,
     queryParamBindings,
+    rewriteSlices,
+    -- | hasql codecs
+    hasqlColumnCodec,
   )
 where
 
@@ -23,6 +28,7 @@ import Data.ProtoLens.Labels ()
 import Data.Text qualified
 import Data.Vector (Vector)
 import Proto.Protos.Codegen qualified
+import Sqlc.Hs.Backend (Backend (..))
 import Sqlc.Hs.Config (Config (..), HaskellType (..), Naming (..), Override (..), defaultConfig)
 import Sqlc.Hs.NameTemplate qualified
 import System.FilePath ((<.>))
@@ -257,12 +263,44 @@ newtype Overrides a = Overrides [Vector a]
 resolveType :: ResolveType -> Proto.Protos.Codegen.Column -> Maybe (Proto.Protos.Codegen.Column, NonEmpty HaskellType)
 resolveType = coerce
 
-newResolveType ::
+-- | The user's @overrides@, in configuration order.
+newOverrideResolver ::
   Config ->
   -- | Engine, if defined
   Text ->
   ResolveType
-newResolveType config engine = ResolveType $ \column ->
+newOverrideResolver config engine =
+  fromMatchers engine (map overrideToMatcher (configOverrides config))
+
+-- | The type mappings sqlc-hs knows out of the box.
+newBuiltinResolver ::
+  Maybe Backend ->
+  -- | Engine, if defined
+  Text ->
+  ResolveType
+newBuiltinResolver backend engine =
+  fromMatchers engine (builtins backend)
+
+-- | The first override matching a column, if any. 'newOverrideResolver' tells
+-- you /that/ an override matched; this tells you /which/ one, which is what
+-- carries the hasql codecs.
+findOverride ::
+  Config ->
+  -- | Engine, if defined
+  Text ->
+  Proto.Protos.Codegen.Column ->
+  Maybe Override
+findOverride config engine column =
+  find
+    (\override -> matchesEngine engine override.engine && overrideMatches override column)
+    (configOverrides config)
+
+configOverrides :: Config -> [Override]
+configOverrides config =
+  toList (Overrides config.overrides)
+
+fromMatchers :: Text -> [Matcher] -> ResolveType
+fromMatchers engine allMatchers = ResolveType $ \column ->
   case mapMaybe (\matcher -> matcher.matcher column) matchers of
     haskellTypes : _ ->
       Just (column, haskellTypes)
@@ -271,19 +309,21 @@ newResolveType config engine = ResolveType $ \column ->
   where
     matchers :: [Matcher]
     matchers =
-      [ matcher
-        | matcher <-
-            concat
-              [ map overrideToMatcher (toList (Overrides config.overrides)),
-                builtins
-              ],
-          -- In case the GenerateRequest didn't specify an engine.
-          engine == mempty
-            -- In case the matcher is engine generic
-            || isNothing matcher.engine
-            -- In case matcher engine and requested engine match
-            || matcher.engine == Just engine
-      ]
+      filter (matchesEngine engine . (.engine)) allMatchers
+
+matchesEngine ::
+  -- | The requested engine, if defined
+  Text ->
+  -- | The engine a matcher is restricted to, if any
+  Maybe Text ->
+  Bool
+matchesEngine engine matcherEngine =
+  -- In case the GenerateRequest didn't specify an engine.
+  engine == mempty
+    -- In case the matcher is engine generic
+    || isNothing matcherEngine
+    -- In case matcher engine and requested engine match
+    || matcherEngine == Just engine
 
 newEnumResolver ::
   HaskellType ->
@@ -321,24 +361,29 @@ overrideToMatcher override =
         haskellType {name = fmap wrapParenthesis haskellType.name}
           :| haskellTypes
 
-    -- Every constraint present on the override must hold: db_type (if given)
-    -- and column (if given). The FromJSON instance guarantees at least one of
-    -- the two is set, so this can never match unconditionally.
     matchType column
-      | fromMaybe False override.nullable /= not (column ^. #notNull) =
-          Nothing
-      | matchesDatabaseType column,
-        matchesColumn column =
+      | overrideMatches override column =
           Just override.haskellType
       | otherwise =
           Nothing
 
-    matchesDatabaseType column =
+-- | Every constraint present on the override must hold: db_type (if given) and
+-- column (if given). The FromJSON instance guarantees at least one of the two
+-- is set, so this can never match unconditionally.
+overrideMatches :: Override -> Proto.Protos.Codegen.Column -> Bool
+overrideMatches override column =
+  and
+    [ fromMaybe False override.nullable == not (column ^. #notNull),
+      matchesDatabaseType,
+      matchesColumn
+    ]
+  where
+    matchesDatabaseType =
       case override.databaseType of
         Nothing -> True
         Just databaseType -> columnDataType (column ^. #type') == databaseType
 
-    matchesColumn column =
+    matchesColumn =
       case override.column of
         Nothing -> True
         Just name -> columnMatches name column
@@ -391,9 +436,9 @@ enumMatcher typeTemplate enums =
                 Nothing
     }
 
-builtins :: [Matcher]
-builtins =
-  [ Matcher {engine = Just "postgresql", matcher = postgresBuiltin},
+builtins :: Maybe Backend -> [Matcher]
+builtins backend =
+  [ Matcher {engine = Just "postgresql", matcher = postgresBuiltin backend},
     Matcher {engine = Just "mysql", matcher = mysqlBuiltin},
     Matcher {engine = Just "sqlite", matcher = sqliteBuiltin}
   ]
@@ -687,8 +732,8 @@ sqliteBuiltin column =
       | otherwise =
           Nothing
 
-postgresBuiltin :: Proto.Protos.Codegen.Column -> Maybe (NonEmpty HaskellType)
-postgresBuiltin column =
+postgresBuiltin :: Maybe Backend -> Proto.Protos.Codegen.Column -> Maybe (NonEmpty HaskellType)
+postgresBuiltin backend column =
   applyNullable column $
     applyArrayLike column identity $
       asum
@@ -700,14 +745,25 @@ postgresBuiltin column =
           pgType ["smallint", "int2", "pg_catalog.int2"] "base" "Data.Int.Int16",
           pgType ["float", "double precision", "float8", "pg_catalog.float8"] "ghc-prim" "GHC.Types.Double",
           pgType ["real", "float4", "pg_catalog.float4"] "ghc-prim" "GHC.Types.Float",
-          pgType ["numeric", "pg_catalog.numeric", "money"] "scientific" "Data.Scientific.Scientific",
+          -- hasql has no codec for "money", so leave it unresolved there: the
+          -- user gets a "could not resolve type" error pointing at the column
+          -- instead of a decoder that fails at runtime. Same for "name" below.
+          pgType (["numeric", "pg_catalog.numeric"] <> unlessHasql ["money"]) "scientific" "Data.Scientific.Scientific",
           pgType ["boolean", "bool", "pg_catalog.bool"] "ghc-prim" "GHC.Types.Bool",
           pgType ["json", "pg_catalog.json"] "aeson" "Data.Aeson.Value",
           pgType ["jsonb", "pg_catalog.jsonb"] "aeson" "Data.Aeson.Value",
           pgBinary ["bytea", "blob", "pg_catalog.bytea"],
-          pgType ["text", "pg_catalog.varchar", "pg_catalog.bpchar", "string", "citext", "name"] "text" "Data.Text.Text"
+          pgType
+            (["text", "pg_catalog.varchar", "pg_catalog.bpchar", "string", "citext"] <> unlessHasql ["name"])
+            "text"
+            "Data.Text.Text"
         ]
   where
+    unlessHasql types =
+      case backend of
+        Just Hasql -> []
+        _ -> types
+
     columnType :: Text
     columnType =
       columnDataType (column ^. #type')
@@ -728,7 +784,18 @@ postgresBuiltin column =
       | otherwise =
           Nothing
 
+    -- postgresql-simple needs the Binary wrapper to send/receive bytea in the
+    -- binary format; hasql's bytea codec works on a plain ByteString.
     pgBinary pgTypes
+      | columnType `elem` pgTypes,
+        Just Hasql <- backend =
+          Just $
+            pure
+              HaskellType
+                { package = Just "bytestring",
+                  module' = Just "Data.ByteString",
+                  name = Just "Data.ByteString.ByteString"
+                }
       | columnType `elem` pgTypes =
           Just $
             HaskellType
@@ -836,3 +903,206 @@ queryParamBindings engine query =
         takeDigits = Data.Text.takeWhile Data.Char.isDigit
         bindingFor index segment =
           fromMaybe index (readMaybe (toString (takeDigits segment)))
+
+-- | The hasql @(encoder, decoder)@ pair to use for a column.
+--
+-- An override that carries @hasql_encoder@ / @hasql_decoder@ decides the codec
+-- outright. Failing that, an override that chose the column's Haskell type also
+-- decides its codec, so we go through the generated @ToField@ / @FromField@
+-- classes, which the user can instantiate for whatever type they picked. Only
+-- when sqlc-hs typed the column itself do we know the codec, and then we take
+-- it from the SQL type.
+hasqlColumnCodec ::
+  -- | The override that matched the column, if any
+  Maybe Override ->
+  Proto.Protos.Codegen.Column ->
+  (Text, Text)
+hasqlColumnCodec override column =
+  ( wrapHasqlEncoder column encoder,
+    wrapHasqlDecoder column decoder
+  )
+  where
+    (encoder, decoder) =
+      case override of
+        Just Override {hasqlEncoder = Just encoder, hasqlDecoder = Just decoder} ->
+          (encoder, decoder)
+        Just _ ->
+          classCodec
+        Nothing ->
+          fromMaybe classCodec (hasqlValueCodec (columnDataType (column ^. #type')))
+
+    classCodec =
+      ("toField", "fromField")
+
+-- | hasql's codec for a PostgreSQL type, as @(encoder, decoder)@ expressions.
+--
+-- Unlike postgresql-simple, hasql picks a codec per SQL type rather than per
+-- Haskell type, and from 1.10 on it rejects a result whose column OID doesn't
+-- match the decoder. @text@, @varchar@ and @bpchar@ all map to 'Text' but need
+-- three different decoders, so the choice has to be made here, from the type
+-- sqlc reported, and not from a class keyed on the Haskell type.
+hasqlValueCodec ::
+  -- | Database type, as 'columnDataType' renders it
+  Text ->
+  Maybe (Text, Text)
+hasqlValueCodec databaseType =
+  fmap codec $
+    find
+      (\(databaseTypes, _codec) -> databaseType `elem` databaseTypes)
+      [ (["serial", "serial4", "pg_catalog.serial4", "integer", "int", "int4", "pg_catalog.int4"], "int4"),
+        (["bigserial", "serial8", "pg_catalog.serial8", "bigint", "int8", "pg_catalog.int8"], "int8"),
+        (["smallserial", "serial2", "pg_catalog.serial2", "smallint", "int2", "pg_catalog.int2"], "int2"),
+        (["float", "double precision", "float8", "pg_catalog.float8"], "float8"),
+        (["real", "float4", "pg_catalog.float4"], "float4"),
+        (["numeric", "pg_catalog.numeric"], "numeric"),
+        (["boolean", "bool", "pg_catalog.bool"], "bool"),
+        (["json", "pg_catalog.json"], "json"),
+        (["jsonb", "pg_catalog.jsonb"], "jsonb"),
+        (["bytea", "blob", "pg_catalog.bytea"], "bytea"),
+        (["text", "string", "pg_catalog.text"], "text"),
+        (["varchar", "pg_catalog.varchar"], "varchar"),
+        (["bpchar", "pg_catalog.bpchar"], "bpchar"),
+        (["citext"], "citext")
+      ]
+  where
+    codec (_databaseTypes, name) =
+      ("Hasql.Encoders." <> name, "Hasql.Decoders." <> name)
+
+-- | Lift a hasql value encoder to the parameter encoder for a column, applying
+-- the same nullability and array wrapping that 'applyNullable' and
+-- 'applyArrayLike' applied to the column's Haskell type.
+wrapHasqlEncoder :: Proto.Protos.Codegen.Column -> Text -> Text
+wrapHasqlEncoder =
+  wrapHasqlValue "Hasql.Encoders" "foldableArray"
+
+-- | 'wrapHasqlEncoder' for decoders. Array columns decode into a 'Vector', which
+-- is what 'wrapVector' gave them as a Haskell type.
+wrapHasqlDecoder :: Proto.Protos.Codegen.Column -> Text -> Text
+wrapHasqlDecoder =
+  wrapHasqlValue "Hasql.Decoders" "vectorArray"
+
+wrapHasqlValue :: Text -> Text -> Proto.Protos.Codegen.Column -> Text -> Text
+wrapHasqlValue module' arrayCodec column value =
+  qualified nullability <> " " <> wrapParenthesis arrayed
+  where
+    qualified name =
+      module' <> "." <> name
+
+    nullability
+      | column ^. #notNull = "nonNullable"
+      | otherwise = "nullable"
+
+    arrayed
+      | column ^. #isArray || column ^. #isSqlcSlice =
+          qualified arrayCodec
+            <> " "
+            <> wrapParenthesis (qualified "nonNullable" <> " " <> wrapParenthesis value)
+      | otherwise =
+          value
+
+-- | Rewrite the @IN@ / @NOT IN@ operators over @sqlc.slice@ parameters into
+-- their array equivalents.
+--
+-- PostgreSQL's @IN@ takes a syntactic list of values, not an array, which is
+-- why postgresql-simple expands a slice into as many placeholders as there are
+-- elements. hasql binds one parameter per placeholder and cannot do that, so
+-- the array operators have to be used instead:
+--
+--   * @x IN ($1)@ becomes @x = ANY ($1)@
+--   * @x NOT IN ($1)@ becomes @x <> ALL ($1)@
+--
+-- Returns 'Left' when a slice parameter isn't in a shape we recognise, rather
+-- than emitting SQL that only fails once it reaches the server.
+rewriteSlices ::
+  -- | The numbers of the parameters that are slices
+  [Int] ->
+  Text ->
+  Either Text Text
+rewriteSlices slices sql
+  | null slices =
+      Right sql
+  | otherwise =
+      go mempty sql
+  where
+    go acc input =
+      case Data.Text.breakOn "$" input of
+        (before, rest)
+          | Just rest <- Data.Text.stripPrefix "$" rest,
+            (digits, after) <- Data.Text.span Data.Char.isDigit rest,
+            Just number <- readMaybe (toString digits),
+            number `elem` slices ->
+              case rewriteSlice (acc <> before) digits after of
+                Left errorMessage ->
+                  Left errorMessage
+                Right (acc, after) ->
+                  go acc after
+          | Just rest <- Data.Text.stripPrefix "$" rest,
+            (digits, after) <- Data.Text.span Data.Char.isDigit rest ->
+              go (acc <> before <> "$" <> digits) after
+          | otherwise ->
+              Right (acc <> before)
+
+    -- 'before' is everything preceding the placeholder, 'after' everything
+    -- following it. Both get rewritten: the operator sits in front of the
+    -- placeholder, the closing parenthesis (if any) behind it.
+    rewriteSlice before digits after = do
+      let placeholder = "$" <> digits
+
+          -- sqlc marks slices with a comment for the engines that use
+          -- positional placeholders. Drop it, it has served its purpose.
+          withoutMarker = stripSliceMarker before
+
+          (withoutParenthesis, parenthesised) =
+            case Data.Text.stripSuffix "(" (Data.Text.stripEnd withoutMarker) of
+              Just before -> (before, True)
+              Nothing -> (withoutMarker, False)
+
+      after <-
+        if parenthesised
+          then
+            whenNothing
+              (Data.Text.stripPrefix ")" (Data.Text.stripStart after))
+              (Left (unsupported placeholder))
+          else pure after
+
+      beforeIn <-
+        whenNothing
+          (stripKeywordSuffix "IN" (Data.Text.stripEnd withoutParenthesis))
+          (Left (unsupported placeholder))
+
+      pure $
+        case stripKeywordSuffix "NOT" (Data.Text.stripEnd beforeIn) of
+          Just beforeNot ->
+            (Data.Text.stripEnd beforeNot <> " <> ALL (" <> placeholder <> ")", after)
+          Nothing ->
+            (Data.Text.stripEnd beforeIn <> " = ANY (" <> placeholder <> ")", after)
+
+    unsupported placeholder =
+      "The slice parameter "
+        <> placeholder
+        <> " is not used with IN or NOT IN. hasql binds a slice as a single\
+           \ array parameter, which PostgreSQL only accepts with the array\
+           \ operators; write the comparison as \"= ANY(sqlc.arg(...)::type[])\"\
+           \ in your SQL instead of using sqlc.slice."
+
+-- | Strip a @/*SLICE:name*/@ marker off the end of the text, if there is one.
+stripSliceMarker :: Text -> Text
+stripSliceMarker input = fromMaybe input $ do
+  comment <- Data.Text.stripSuffix "*/" (Data.Text.stripEnd input)
+  let (before, marker) = Data.Text.breakOnEnd "/*" comment
+  guard ("SLICE:" `Data.Text.isPrefixOf` marker)
+  Data.Text.stripSuffix "/*" before
+
+-- | Strip a keyword off the end of the text, case insensitively, requiring it
+-- to be a word of its own rather than the tail of an identifier.
+stripKeywordSuffix :: Text -> Text -> Maybe Text
+stripKeywordSuffix keyword input = do
+  guard (Data.Text.length input >= Data.Text.length keyword)
+  let (before, suffix) =
+        Data.Text.splitAt (Data.Text.length input - Data.Text.length keyword) input
+  guard (Data.Text.toUpper suffix == keyword)
+  guard (maybe True (not . isIdentifierChar . snd) (Data.Text.unsnoc before))
+  pure before
+  where
+    isIdentifierChar c =
+      Data.Char.isAlphaNum c || c == '_'

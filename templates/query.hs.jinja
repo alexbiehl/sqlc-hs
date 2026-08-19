@@ -15,6 +15,11 @@ import qualified Database.PostgreSQL.Simple.FromRow
 import qualified Database.PostgreSQL.Simple.ToField
 import qualified Database.PostgreSQL.Simple.ToRow
 {% endif %}
+{% if generateHasql %}
+import {{ internalModuleName }} (Query(..), Enum, Params, Result, ToRow(..), FromRow(..), ToField(..), FromField(..))
+import qualified Hasql.Decoders
+import qualified Hasql.Encoders
+{% endif %}
 {% if generateSqlite %}
 import {{ internalModuleName }} (Query(..), Enum, Params, Result)
 import qualified Database.SQLite.Simple.FromRow
@@ -71,6 +76,22 @@ instance Database.PostgreSQL.Simple.FromRow.FromRow (Result {{ escapedQueryName 
     pure {{ haskellResultName }}
     {% for column in resultColumns %}
       <*> Database.PostgreSQL.Simple.FromRow.field
+    {% endfor %}
+{% endif %}
+{% if generateHasql %}
+instance ToRow (Params {{ escapedQueryName }}) where
+  toRow =
+    mconcat
+      [ {% for param in encoderColumns %}
+      Data.Functor.Contravariant.contramap (\{{ haskellParamsName }}{..} -> {{ param.value.name }}) (Hasql.Encoders.param ({{ param.value.encoder }})){% if !param.last %}, {% endif %}
+      {% endfor %}
+      ]
+
+instance FromRow (Result {{ escapedQueryName }}) where
+  fromRow =
+    pure {{ haskellResultName }}
+    {% for column in resultColumns %}
+      <*> Hasql.Decoders.column ({{ column.value.decoder }})
     {% endfor %}
 {% endif %}
 

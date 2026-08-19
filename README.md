@@ -2,7 +2,7 @@
 
 A Haskell code generator plugin for [sqlc](https://github.com/kyleconroy/sqlc), allowing you to generate idiomatic Haskell types and functions directly from your SQL queries.
 
-It leverages [postgresql-simple](https://hackage.haskell.org/package/postgresql-simple), [mysql-simple](https://hackage.haskell.org/package/mysql-simple), and [sqlite-simple](https://hackage.haskell.org/package/sqlite-simple), generating a thin layer on top of these well-known libraries.
+It leverages [postgresql-simple](https://hackage.haskell.org/package/postgresql-simple), [hasql](https://hackage.haskell.org/package/hasql), [mysql-simple](https://hackage.haskell.org/package/mysql-simple), and [sqlite-simple](https://hackage.haskell.org/package/sqlite-simple), generating a thin layer on top of these well-known libraries.
 
 ## Installation
 
@@ -67,6 +67,136 @@ sql:
                 type: Data.ByteString.ByteString
 ```
 
+## Drivers
+
+`driver` selects the Haskell library the generated code is written against.
+Every engine has a default, so configurations that don't set it keep generating
+exactly the code they did before.
+
+| Engine       | `driver`                     | Default             |
+| ------------ | ---------------------------- | ------------------- |
+| `postgresql` | `postgresql-simple`, `hasql` | `postgresql-simple` |
+| `mysql`      | `mysql-simple`               | `mysql-simple`      |
+| `sqlite`     | `sqlite-simple`              | `sqlite-simple`     |
+
+```yaml
+sql:
+  - engine: postgresql
+    queries: query.sql
+    schema: schema.sql
+    codegen:
+      - out: gen
+        plugin: haskell
+        options:
+          driver: hasql
+          cabal_package_name: your-package
+```
+
+### The hasql driver
+
+Requires **hasql >= 1.10**, 2.x included. The generated cabal file depends on
+`hasql` without a version bound, like every other dependency it emits, so an
+older `hasql` pinned elsewhere in your project shows up as a compile error
+rather than a solver one.
+
+The generated `Queries.Internal` module gives every query the same helpers as
+the other drivers do — `exec`, `execRows`, `execResult`, `queryOne`,
+`queryMany`, `fold` and `execMany` — taking a `Hasql.Connection.Connection` and
+returning `IO (Either Hasql.Errors.SessionError a)`:
+
+```haskell
+users <- queryMany connection query_ListUsers Params_ListUsers {age = 42}
+```
+
+Each of those runs its query in a session of its own. Every one also comes as a
+`…Session` variant returning a `Hasql.Session.Session`, for when several
+queries have to share one session:
+
+```haskell
+result <-
+  Hasql.Connection.use connection $ do
+    _ <- execSession query_InsertAuthor (Params_InsertAuthor {name = "Kafka"})
+    queryManySession query_ListAuthors Params_ListAuthors {}
+```
+
+Two things work differently from the postgresql-simple driver:
+
+* `fold`'s step function is pure (`a -> Result name -> a`) — hasql folds a
+  result without `IO`.
+* `sqlc.slice` parameters are bound as one array parameter, which PostgreSQL
+  only accepts with the array operators, so `IN ($1)` is generated as
+  `= ANY ($1)` and `NOT IN ($1)` as `<> ALL ($1)`. A slice used anywhere else
+  is an error; write `= ANY(sqlc.arg(...)::type[])` in your SQL instead of
+  using `sqlc.slice`.
+
+#### Codecs
+
+hasql has no `ToField`-style class. Its encoders and decoders are values, chosen
+per SQL type, and from 1.10 on it checks that a column's type matches the
+decoder reading it — so `text`, `varchar` and `bpchar`, all `Text` on the
+Haskell side, each need their own decoder. sqlc-hs picks the codec from the SQL
+type sqlc reported, for every type it knows.
+
+Columns typed by an `overrides` entry are a different matter: sqlc-hs cannot
+know what codec your type wants. Those go through the `ToField` and `FromField`
+classes that the generated `Queries.Internal` module declares:
+
+```haskell
+class ToField a   where toField   :: Hasql.Encoders.Value a
+class FromField a where fromField :: Hasql.Decoders.Value a
+```
+
+Instances ship for `Bool`, the sized `Int`s, `Float`, `Double`, `Scientific`,
+`Char`, `Text`, `ByteString`, `UUID`, `Day`, `LocalTime`, `UTCTime`,
+`TimeOfDay`, `(TimeOfDay, TimeZone)`, `DiffTime`, `Data.Aeson.Value`, and lists
+and vectors of those. The usual overrides therefore need nothing extra — a
+`uuid` column mapped to `Data.UUID.UUID`, a `timestamptz` to `UTCTime`, a `date`
+to `Day` all work as they stand. For a type of your own, write the instance:
+
+```haskell
+instance ToField UserId where
+  toField = Data.Functor.Contravariant.contramap unUserId toField
+
+instance FromField UserId where
+  fromField = fmap UserId fromField
+```
+
+When an instance is the wrong place for it, because the same Haskell type wants
+different codecs in different columns, an override can name the codecs itself
+with `hasql_encoder` and `hasql_decoder`. `UTCTime`'s instance is
+`timestamptz`, so a `timestamp` column read as a `UTCTime` has to spell out the
+conversion:
+
+```yaml
+overrides:
+  - db_type: pg_catalog.timestamp
+    haskell_type:
+      package: time
+      module: Data.Time
+      type: Data.Time.UTCTime
+    hasql_encoder: Data.Functor.Contravariant.contramap (Data.Time.utcToLocalTime Data.Time.utc) Hasql.Encoders.timestamp
+    hasql_decoder: fmap (Data.Time.localTimeToUTC Data.Time.utc) Hasql.Decoders.timestamp
+```
+
+Both are Haskell expressions spliced into the generated code, and both have to
+be given together.
+
+Enum codecs are generated into `Queries.Types` from the catalog, so enums need
+nothing either.
+
+#### Limitations
+
+* `money` and `name` columns cannot be typed: hasql ships no codec for either,
+  so sqlc-hs reports them as unresolved rather than generating a decoder that
+  fails against the server. To use one anyway, give it an override whose
+  `hasql_encoder`/`hasql_decoder` are built with `Hasql.Encoders.custom` and
+  `Hasql.Decoders.custom`.
+* A value cannot be decoded from a SQL type it is not stored as.
+  postgresql-simple parses the text form, so `CAST(created_at AS TEXT)` can be
+  read as a `UTCTime` (see the override examples below); hasql decodes the
+  binary form and checks the column's type, so the SQL type and the codec have
+  to agree.
+
 ## Overrides
 
 `overrides` is a **list** of mappings — each entry tells sqlc-hs to map a
@@ -84,6 +214,8 @@ Each override accepts the following keys:
 | `column`       | no*      | Match a specific column: `column`, `table.column` or `schema.table.column`. The table part matches the table name or its query alias; a bare `column` also matches aliased expression outputs (e.g. `CAST(... AS TEXT) AS created_at`), which carry no table. |
 | `engine`       | no       | Restrict the override to a specific engine (`postgresql`, `mysql`, or `sqlite`). Useful when one configuration targets multiple engines.                      |
 | `nullable`     | no       | If `true`, only match columns that are nullable. If `false` or omitted, only match columns that are `NOT NULL`.                                              |
+| `hasql_encoder` | no      | hasql only: the `Hasql.Encoders.Value` expression to encode matching columns with. Must be given together with `hasql_decoder`. See [The hasql driver](#the-hasql-driver). |
+| `hasql_decoder` | no      | hasql only: the `Hasql.Decoders.Value` expression to decode matching columns with. Must be given together with `hasql_encoder`.                              |
 
 \* At least one of `db_type` or `column` must be given. When both are given,
 both must match.

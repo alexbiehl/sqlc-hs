@@ -6,6 +6,8 @@ optional-packages:
   test/golden/simple-query-mysql,
   test/golden/simple-query-postgresql
   test/golden/simple-query-sqlite
+  test/golden/simple-query-hasql
+  test/golden/hasql-features
   test/golden/pulse
 
 allow-newer:

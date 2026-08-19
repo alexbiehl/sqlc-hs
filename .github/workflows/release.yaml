@@ -85,6 +85,8 @@ jobs:
           TARBALL=$(ls dist-newstyle/sdist/*.tar.gz)
           cabal upload --publish --token="$HACKAGE_TOKEN" "$TARBALL"
 
+  # These build steps are mirrored in wasm.yaml, which builds the same module
+  # on demand without cutting a release; keep the two in step.
   build-wasm:
     runs-on: ubuntu-22.04
     needs: create_release

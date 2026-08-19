@@ -1,0 +1,69 @@
+name: WASM test build
+
+# Builds the plugin as a WASM module and attaches it to the run as an
+# artifact, without cutting a release. Start it from the Actions tab
+# ("Run workflow") and pick the branch you want built.
+#
+# The build steps mirror the build-wasm job in release.yaml; keep the two in
+# step when either changes.
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build-wasm:
+    runs-on: ubuntu-22.04
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Name the build after the commit
+      id: build
+      run: echo "name=sqlc-hs-$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+
+    - name: Build
+      run: |
+        curl https://gitlab.haskell.org/haskell-wasm/ghc-wasm-meta/-/raw/master/bootstrap.sh | sh
+        source ~/.ghc-wasm/env
+
+        # The golden-test optional-packages pull in database bindings
+        # that don't solve for wasm32-wasi, so build from a minimal
+        # project file (this also sidesteps cabal.project.freeze).
+        printf 'packages: .\npackage *\n  split-sections: True\n' > cabal.project.wasm
+        wasm32-wasi-cabal update hackage.haskell.org,2026-07-14T12:13:01Z
+        wasm32-wasi-cabal build --project-file=cabal.project.wasm --allow-newer exe:sqlc-hs
+        cp $(wasm32-wasi-cabal list-bin --project-file=cabal.project.wasm --allow-newer exe:sqlc-hs) "./${{ steps.build.outputs.name }}.wasm"
+
+    - name: Summary
+      run: |
+        WASM="./${{ steps.build.outputs.name }}.wasm"
+        SHA256=$(sha256sum "$WASM" | awk '{ print $1 }')
+
+        cat <<EOF >> $GITHUB_STEP_SUMMARY
+        Built \`${{ steps.build.outputs.name }}.wasm\` from ${{ github.ref_name }} ($(du -h "$WASM" | cut -f1)).
+
+        Download it from the artifacts of this run, then point sqlc at the file
+        you downloaded:
+
+        \`\`\`yaml
+        version: '2'
+        plugins:
+          - name: haskell
+            wasm:
+              url: file:///absolute/path/to/${{ steps.build.outputs.name }}.wasm
+              sha256: $SHA256
+        \`\`\`
+
+        \`sha256\` is optional since sqlc 1.24, but without it sqlc re-reads the
+        module on every run instead of caching it.
+        EOF
+
+    - uses: actions/upload-artifact@v4
+      with:
+        name: ${{ steps.build.outputs.name }}.wasm
+        path: ${{ steps.build.outputs.name }}.wasm
+        if-no-files-found: error
+        retention-days: 14

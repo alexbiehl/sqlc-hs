@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
@@ -46,7 +47,7 @@ module Queries.Internal (
     -- * Reexports
     Hasql.Connection.Connection,
     Hasql.Session.Session,
-    Hasql.Errors.UseError,
+    RunnerError,
     Hasql.Errors.SessionError,
   ) where
 
@@ -69,6 +70,22 @@ import qualified Hasql.Errors
 import qualified Hasql.Pipeline
 import qualified Hasql.Session
 import qualified Hasql.Statement
+
+-- | What a runner reports when it fails.
+--
+-- hasql 2.1 replaced the single session-error type that
+-- 'Hasql.Connection.use' returned with @UseError@, which distinguishes a
+-- statement that failed on a live connection (@SessionUseError@, wrapping the
+-- 'Hasql.Errors.SessionError' the old type expressed) from a connection that is
+-- gone and has already been closed (@ConnectionUseError@).
+--
+-- Named through this alias so the generated module compiles against both, and
+-- so a call site that only passes the error along does not have to care.
+#if MIN_VERSION_hasql(2,1,0)
+type RunnerError = Hasql.Errors.UseError
+#else
+type RunnerError = Hasql.Errors.SessionError
+#endif
 
 -- | The SQL of a query, with PostgreSQL's positional @$1@, @$2@ placeholders
 -- left as sqlc emitted them.
@@ -257,7 +274,7 @@ exec ::
   Hasql.Connection.Connection ->
   Query name ":exec" ->
   Params name ->
-  IO (Either Hasql.Errors.UseError ())
+  IO (Either RunnerError ())
 exec connection query params =
   Hasql.Connection.use connection (execSession query params)
 
@@ -274,7 +291,7 @@ execRows ::
   Hasql.Connection.Connection ->
   Query name ":execrows" ->
   Params name ->
-  IO (Either Hasql.Errors.UseError Data.Int.Int64)
+  IO (Either RunnerError Data.Int.Int64)
 execRows connection query params =
   Hasql.Connection.use connection (execRowsSession query params)
 
@@ -291,7 +308,7 @@ execResult ::
   Hasql.Connection.Connection ->
   Query name ":execresult" ->
   Params name ->
-  IO (Either Hasql.Errors.UseError ExecResult)
+  IO (Either RunnerError ExecResult)
 execResult connection query params =
   Hasql.Connection.use connection (execResultSession query params)
 
@@ -311,7 +328,7 @@ queryOne ::
   Hasql.Connection.Connection ->
   Query name ":one" ->
   Params name ->
-  IO (Either Hasql.Errors.UseError (Maybe (Result name)))
+  IO (Either RunnerError (Maybe (Result name)))
 queryOne connection query params =
   Hasql.Connection.use connection (queryOneSession query params)
 
@@ -328,7 +345,7 @@ queryMany ::
   Hasql.Connection.Connection ->
   Query name ":many" ->
   Params name ->
-  IO (Either Hasql.Errors.UseError (Vector (Result name)))
+  IO (Either RunnerError (Vector (Result name)))
 queryMany connection query params =
   Hasql.Connection.use connection (queryManySession query params)
 
@@ -349,7 +366,7 @@ fold ::
   Params name ->
   a ->
   (a -> Result name -> a) ->
-  IO (Either Hasql.Errors.UseError a)
+  IO (Either RunnerError a)
 fold connection query params initial step =
   Hasql.Connection.use connection (foldSession query params initial step)
 {-# INLINABLE fold #-}
@@ -372,7 +389,7 @@ execMany ::
   Hasql.Connection.Connection ->
   Query name ":copyfrom" ->
   f (Params name) ->
-  IO (Either Hasql.Errors.UseError Data.Int.Int64)
+  IO (Either RunnerError Data.Int.Int64)
 execMany connection query params =
   Hasql.Connection.use connection (execManySession query params)
 

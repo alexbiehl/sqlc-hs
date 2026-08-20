@@ -33,6 +33,7 @@ data instance Result "FindPosts" = Result_FindPosts
   }
 
 instance ToRow (Params "FindPosts") where
+  {-# INLINE toRow #-}
   toRow =
     mconcat
       [ 
@@ -40,6 +41,7 @@ instance ToRow (Params "FindPosts") where
       ]
 
 instance FromRow (Result "FindPosts") where
+  {-# INLINE fromRow #-}
   fromRow =
     pure Result_FindPosts
       <*> Hasql.Decoders.column (Hasql.Decoders.nonNullable (Hasql.Decoders.vectorArray (Hasql.Decoders.nonNullable Hasql.Decoders.text)))

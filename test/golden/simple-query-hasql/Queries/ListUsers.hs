@@ -44,6 +44,7 @@ data instance Result "ListUsers" = Result_ListUsers
   }
 
 instance ToRow (Params "ListUsers") where
+  {-# INLINE toRow #-}
   toRow =
     mconcat
       [ 
@@ -51,6 +52,7 @@ instance ToRow (Params "ListUsers") where
       ]
 
 instance FromRow (Result "ListUsers") where
+  {-# INLINE fromRow #-}
   fromRow =
     pure Result_ListUsers
       <*> Hasql.Decoders.column (Hasql.Decoders.nonNullable Hasql.Decoders.int4)

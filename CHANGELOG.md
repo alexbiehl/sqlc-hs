@@ -1,6 +1,6 @@
 # Revision history for sqlc-haskell
 
-## Unreleased
+## 0.3.0.0 -- 2026-08-20
 
 * A hasql backend for PostgreSQL, selected with the new `driver` option
   (`driver: hasql`). The default stays `postgresql-simple`, so existing
@@ -10,6 +10,17 @@
   their codecs with the new `hasql_encoder` and `hasql_decoder` keys.
 * Normalise numbered `?N` placeholders (emitted by sqlc for `sqlc.arg`)
   to positional `?` so sqlite-simple can parse the query (SQLite).
+* The hasql runners' error type is now named through a `RunnerError`
+  alias that CPP picks per hasql version, so the generated module
+  compiles against both hasql 2.0 (`SessionError`) and hasql 2.1, which
+  replaced it with `UseError` (hasql).
+* The generated hasql `ToRow`/`FromRow` instances carry `INLINE`. A row
+  decoder is a chain of `<$>` and `<*>`, and without an unfolding at the
+  instance that chain cannot collapse at its definition site, so every
+  column of every row pays for the closures it is made of. Pairs with
+  nikita-volkov/hasql#340, which fixes the same problem inside hasql;
+  together they cut allocation for a 1001-row two-column decode by
+  10.2% (hasql).
 
 ## 0.2.0.1 -- 2026-07-14
 

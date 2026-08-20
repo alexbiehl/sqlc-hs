@@ -46,6 +46,7 @@ module {{ moduleName }} (
     -- * Reexports
     Hasql.Connection.Connection,
     Hasql.Session.Session,
+    Hasql.Errors.UseError,
     Hasql.Errors.SessionError,
   ) where
 
@@ -256,7 +257,7 @@ exec ::
   Hasql.Connection.Connection ->
   Query name ":exec" ->
   Params name ->
-  IO (Either Hasql.Errors.SessionError ())
+  IO (Either Hasql.Errors.UseError ())
 exec connection query params =
   Hasql.Connection.use connection (execSession query params)
 
@@ -273,7 +274,7 @@ execRows ::
   Hasql.Connection.Connection ->
   Query name ":execrows" ->
   Params name ->
-  IO (Either Hasql.Errors.SessionError Data.Int.Int64)
+  IO (Either Hasql.Errors.UseError Data.Int.Int64)
 execRows connection query params =
   Hasql.Connection.use connection (execRowsSession query params)
 
@@ -290,7 +291,7 @@ execResult ::
   Hasql.Connection.Connection ->
   Query name ":execresult" ->
   Params name ->
-  IO (Either Hasql.Errors.SessionError ExecResult)
+  IO (Either Hasql.Errors.UseError ExecResult)
 execResult connection query params =
   Hasql.Connection.use connection (execResultSession query params)
 
@@ -310,7 +311,7 @@ queryOne ::
   Hasql.Connection.Connection ->
   Query name ":one" ->
   Params name ->
-  IO (Either Hasql.Errors.SessionError (Maybe (Result name)))
+  IO (Either Hasql.Errors.UseError (Maybe (Result name)))
 queryOne connection query params =
   Hasql.Connection.use connection (queryOneSession query params)
 
@@ -327,7 +328,7 @@ queryMany ::
   Hasql.Connection.Connection ->
   Query name ":many" ->
   Params name ->
-  IO (Either Hasql.Errors.SessionError (Vector (Result name)))
+  IO (Either Hasql.Errors.UseError (Vector (Result name)))
 queryMany connection query params =
   Hasql.Connection.use connection (queryManySession query params)
 
@@ -348,7 +349,7 @@ fold ::
   Params name ->
   a ->
   (a -> Result name -> a) ->
-  IO (Either Hasql.Errors.SessionError a)
+  IO (Either Hasql.Errors.UseError a)
 fold connection query params initial step =
   Hasql.Connection.use connection (foldSession query params initial step)
 {-# INLINABLE fold #-}
@@ -371,7 +372,7 @@ execMany ::
   Hasql.Connection.Connection ->
   Query name ":copyfrom" ->
   f (Params name) ->
-  IO (Either Hasql.Errors.SessionError Data.Int.Int64)
+  IO (Either Hasql.Errors.UseError Data.Int.Int64)
 execMany connection query params =
   Hasql.Connection.use connection (execManySession query params)
 

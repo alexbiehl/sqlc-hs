@@ -35,6 +35,7 @@ data instance Result "GetEvent" = Result_GetEvent
   }
 
 instance ToRow (Params "GetEvent") where
+  {-# INLINE toRow #-}
   toRow =
     mconcat
       [ 
@@ -44,6 +45,7 @@ instance ToRow (Params "GetEvent") where
       ]
 
 instance FromRow (Result "GetEvent") where
+  {-# INLINE fromRow #-}
   fromRow =
     pure Result_GetEvent
       <*> Hasql.Decoders.column (Hasql.Decoders.nonNullable fromField)

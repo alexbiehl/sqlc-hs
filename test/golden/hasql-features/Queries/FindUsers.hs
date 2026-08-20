@@ -33,6 +33,7 @@ data instance Result "FindUsers" = Result_FindUsers
   }
 
 instance ToRow (Params "FindUsers") where
+  {-# INLINE toRow #-}
   toRow =
     mconcat
       [ 
@@ -44,6 +45,7 @@ instance ToRow (Params "FindUsers") where
       ]
 
 instance FromRow (Result "FindUsers") where
+  {-# INLINE fromRow #-}
   fromRow =
     pure Result_FindUsers
       <*> Hasql.Decoders.column (Hasql.Decoders.nonNullable Hasql.Decoders.int4)

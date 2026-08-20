@@ -27,11 +27,13 @@ data instance Result "DeleteUsers" = Result_DeleteUsers
   }
 
 instance ToRow (Params "DeleteUsers") where
+  {-# INLINE toRow #-}
   toRow =
     mconcat
       [       ]
 
 instance FromRow (Result "DeleteUsers") where
+  {-# INLINE fromRow #-}
   fromRow =
     pure Result_DeleteUsers
 

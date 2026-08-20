@@ -80,6 +80,7 @@ instance Database.PostgreSQL.Simple.FromRow.FromRow (Result {{ escapedQueryName 
 {% endif %}
 {% if generateHasql %}
 instance ToRow (Params {{ escapedQueryName }}) where
+  {-# INLINE toRow #-}
   toRow =
     mconcat
       [ {% for param in encoderColumns %}
@@ -88,6 +89,7 @@ instance ToRow (Params {{ escapedQueryName }}) where
       ]
 
 instance FromRow (Result {{ escapedQueryName }}) where
+  {-# INLINE fromRow #-}
   fromRow =
     pure {{ haskellResultName }}
     {% for column in resultColumns %}

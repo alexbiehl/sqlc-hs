@@ -12,6 +12,7 @@ module Queries.Types where
 
 import qualified Hasql.Decoders
 import qualified Hasql.Encoders
+import qualified Hasql.Mapping.IsScalar
 import Queries.Internal
 import Prelude hiding (Enum)
 import qualified Prelude

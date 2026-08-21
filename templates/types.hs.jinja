@@ -21,6 +21,7 @@ import qualified Database.PostgreSQL.Simple.ToRow
 {% if generateHasql %}
 import qualified Hasql.Decoders
 import qualified Hasql.Encoders
+import qualified Hasql.Mapping.IsScalar
 {% endif %}
 {% if generateSqlite %}
 import qualified Database.SQLite.Simple.FromRow
@@ -63,16 +64,14 @@ instance Database.PostgreSQL.Simple.FromField.FromField (Enum {{ enum.value.esca
       Nothing -> Database.PostgreSQL.Simple.FromField.returnError Database.PostgreSQL.Simple.FromField.UnexpectedNull field ""
 {% endif %}
 {% if generateHasql %}
-instance ToField (Enum {{ enum.value.escapedEnumName }}) where
-  toField =
+instance Hasql.Mapping.IsScalar.IsScalar (Enum {{ enum.value.escapedEnumName }}) where
+  encoder =
     Hasql.Encoders.enum {{ enum.value.escapedEnumSchema }} {{ enum.value.escapedEnumName }} $ \x ->
       case x of
         {% for value in enum.value.values %}
         {{ value.value.haskellConstructorName }} -> {{ value.value.escapedEnumValue }}
         {% endfor %}
-
-instance FromField (Enum {{ enum.value.escapedEnumName }}) where
-  fromField =
+  decoder =
     Hasql.Decoders.enum {{ enum.value.escapedEnumSchema }} {{ enum.value.escapedEnumName }} $ \x ->
       case x of
         {% for value in enum.value.values %}

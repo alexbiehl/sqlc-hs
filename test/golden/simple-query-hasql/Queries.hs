@@ -7,4 +7,4 @@ where
 
 import Queries.Internal
 import Queries.Types
-import Queries.ListUsers as Queries
+import Queries.ListUsers as Queries hiding (paramsEncoder, rowDecoder)

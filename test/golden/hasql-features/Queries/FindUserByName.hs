@@ -8,9 +8,18 @@
 {-# LANGUAGE TypeFamilies #-}
 module Queries.FindUserByName where
 
-import Queries.Internal (Query(..), Enum, Params, Result, ToRow(..), FromRow(..), ToField(..), FromField(..))
+import Queries.Internal (Query(..), Enum, Params)
+-- The row type is named `Result`, and so is IsStatement's associated type. GHC
+-- rejects a qualified name on the left of an associated type instance, so it is
+-- the row family that gets qualified here instead.
+import qualified Queries.Internal
+import qualified Data.Int
+import qualified Data.Vector
 import qualified Hasql.Decoders
 import qualified Hasql.Encoders
+import qualified Hasql.Mapping.IsScalar
+import qualified Hasql.Mapping.IsStatement
+import qualified Hasql.Statement
 
 import qualified Data.Text
 import qualified Data.Int
@@ -25,23 +34,30 @@ data instance Params "FindUserByName" = Params_FindUserByName
     name :: Data.Text.Text
   }
 
-data instance Result "FindUserByName" = Result_FindUserByName
+data instance Queries.Internal.Result "FindUserByName" = Result_FindUserByName
   {
     id :: !(Data.Int.Int32)
   }
 
-instance ToRow (Params "FindUserByName") where
-  {-# INLINE toRow #-}
-  toRow =
-    mconcat
-      [ 
-      Data.Functor.Contravariant.contramap (\Params_FindUserByName{..} -> name) (Hasql.Encoders.param (Hasql.Encoders.nonNullable Hasql.Encoders.text))
-      ]
+paramsEncoder :: Hasql.Encoders.Params (Params "FindUserByName")
+paramsEncoder =
+  mconcat
+    [ 
+    Data.Functor.Contravariant.contramap (\Params_FindUserByName{..} -> name) (Hasql.Encoders.param (Hasql.Encoders.nonNullable Hasql.Encoders.text))
+    ]
+{-# INLINE paramsEncoder #-}
 
-instance FromRow (Result "FindUserByName") where
-  {-# INLINE fromRow #-}
-  fromRow =
-    pure Result_FindUserByName
-      <*> Hasql.Decoders.column (Hasql.Decoders.nonNullable Hasql.Decoders.int4)
+rowDecoder :: Hasql.Decoders.Row (Queries.Internal.Result "FindUserByName")
+rowDecoder =
+  pure Result_FindUserByName
+    <*> Hasql.Decoders.column (Hasql.Decoders.nonNullable Hasql.Decoders.int4)
+{-# INLINE rowDecoder #-}
+
+instance Hasql.Mapping.IsStatement.IsStatement (Params "FindUserByName") where
+  type Result (Params "FindUserByName") = Data.Vector.Vector (Queries.Internal.Result "FindUserByName")
+  statement =
+    Hasql.Statement.preparable sql paramsEncoder (Hasql.Decoders.rowVector rowDecoder)
+    where
+      Query sql = query_FindUserByName
 
 

@@ -1,5 +1,25 @@
 # Revision history for sqlc-haskell
 
+## Unreleased
+
+* The hasql driver no longer declares codec classes of its own. Overrides go
+  through `hasql-mapping`'s `IsScalar`, which has both `encoder` and `decoder`
+  where sqlc-hs had a `ToField` and a `FromField`; because it comes from a
+  library rather than the generated code, the instance can live wherever the
+  type does — including a package the generated one depends on, which an
+  instance of a generated class could not (hasql).
+* `ToRow`/`FromRow` are gone with them. Each query module now carries a
+  `hasql-mapping` `IsStatement` instance, whose associated `Result` is sqlc's
+  command annotation spelled as a type, and exports its `paramsEncoder` and
+  `rowDecoder` as plain values. Anything accepting an `IsStatement` —
+  `toSession`, `toTransaction` — works on a generated query unchanged (hasql).
+* The runners keep their names, arguments and command tags, so call sites are
+  unaffected; only their constraints change, from the two removed classes to
+  `IsStatement` (hasql).
+* `fold` is removed. `Hasql.Decoders.foldlRows step initial rowDecoder` is the
+  replacement, using the row decoder the query module now exports (hasql).
+* Requires `hasql < 2.1`, which is `hasql-mapping`'s own bound (hasql).
+
 ## 0.3.0.0 -- 2026-08-20
 
 * A hasql backend for PostgreSQL, selected with the new `driver` option

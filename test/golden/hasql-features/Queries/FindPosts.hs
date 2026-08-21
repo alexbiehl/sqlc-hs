@@ -8,9 +8,18 @@
 {-# LANGUAGE TypeFamilies #-}
 module Queries.FindPosts where
 
-import Queries.Internal (Query(..), Enum, Params, Result, ToRow(..), FromRow(..), ToField(..), FromField(..))
+import Queries.Internal (Query(..), Enum, Params)
+-- The row type is named `Result`, and so is IsStatement's associated type. GHC
+-- rejects a qualified name on the left of an associated type instance, so it is
+-- the row family that gets qualified here instead.
+import qualified Queries.Internal
+import qualified Data.Int
+import qualified Data.Vector
 import qualified Hasql.Decoders
 import qualified Hasql.Encoders
+import qualified Hasql.Mapping.IsScalar
+import qualified Hasql.Mapping.IsStatement
+import qualified Hasql.Statement
 
 import qualified Data.Text
 import qualified Data.Vector
@@ -26,25 +35,32 @@ data instance Params "FindPosts" = Params_FindPosts
     tags :: Data.Vector.Vector Data.Text.Text
   }
 
-data instance Result "FindPosts" = Result_FindPosts
+data instance Queries.Internal.Result "FindPosts" = Result_FindPosts
   {
     tags :: !(Data.Vector.Vector Data.Text.Text),
     labels :: !(GHC.Base.Maybe (Data.Vector.Vector Data.Text.Text))
   }
 
-instance ToRow (Params "FindPosts") where
-  {-# INLINE toRow #-}
-  toRow =
-    mconcat
-      [ 
-      Data.Functor.Contravariant.contramap (\Params_FindPosts{..} -> tags) (Hasql.Encoders.param (Hasql.Encoders.nonNullable (Hasql.Encoders.foldableArray (Hasql.Encoders.nonNullable Hasql.Encoders.text))))
-      ]
+paramsEncoder :: Hasql.Encoders.Params (Params "FindPosts")
+paramsEncoder =
+  mconcat
+    [ 
+    Data.Functor.Contravariant.contramap (\Params_FindPosts{..} -> tags) (Hasql.Encoders.param (Hasql.Encoders.nonNullable (Hasql.Encoders.foldableArray (Hasql.Encoders.nonNullable Hasql.Encoders.text))))
+    ]
+{-# INLINE paramsEncoder #-}
 
-instance FromRow (Result "FindPosts") where
-  {-# INLINE fromRow #-}
-  fromRow =
-    pure Result_FindPosts
-      <*> Hasql.Decoders.column (Hasql.Decoders.nonNullable (Hasql.Decoders.vectorArray (Hasql.Decoders.nonNullable Hasql.Decoders.text)))
-      <*> Hasql.Decoders.column (Hasql.Decoders.nullable (Hasql.Decoders.vectorArray (Hasql.Decoders.nonNullable Hasql.Decoders.varchar)))
+rowDecoder :: Hasql.Decoders.Row (Queries.Internal.Result "FindPosts")
+rowDecoder =
+  pure Result_FindPosts
+    <*> Hasql.Decoders.column (Hasql.Decoders.nonNullable (Hasql.Decoders.vectorArray (Hasql.Decoders.nonNullable Hasql.Decoders.text)))
+    <*> Hasql.Decoders.column (Hasql.Decoders.nullable (Hasql.Decoders.vectorArray (Hasql.Decoders.nonNullable Hasql.Decoders.varchar)))
+{-# INLINE rowDecoder #-}
+
+instance Hasql.Mapping.IsStatement.IsStatement (Params "FindPosts") where
+  type Result (Params "FindPosts") = Data.Vector.Vector (Queries.Internal.Result "FindPosts")
+  statement =
+    Hasql.Statement.preparable sql paramsEncoder (Hasql.Decoders.rowVector rowDecoder)
+    where
+      Query sql = query_FindPosts
 
 

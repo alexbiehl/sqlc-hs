@@ -101,8 +101,8 @@ rather than a solver one.
 
 The generated `Queries.Internal` module gives every query the same helpers as
 the other drivers do — `exec`, `execRows`, `execResult`, `queryOne`,
-`queryMany`, `fold` and `execMany` — taking a `Hasql.Connection.Connection` and
-returning `IO (Either Hasql.Errors.SessionError a)`:
+`queryMany` and `execMany` — taking a `Hasql.Connection.Connection` and
+returning `IO (Either RunnerError a)`:
 
 ```haskell
 users <- queryMany connection query_ListUsers Params_ListUsers {age = 42}
@@ -121,45 +121,83 @@ result <-
 
 Two things work differently from the postgresql-simple driver:
 
-* `fold`'s step function is pure (`a -> Result name -> a`) — hasql folds a
-  result without `IO`.
+* There is no `fold`. Each query module exports its row decoder as
+  `rowDecoder`, so a fold is `Hasql.Decoders.foldlRows step initial rowDecoder`
+  against the statement of your choice.
 * `sqlc.slice` parameters are bound as one array parameter, which PostgreSQL
   only accepts with the array operators, so `IN ($1)` is generated as
   `= ANY ($1)` and `NOT IN ($1)` as `<> ALL ($1)`. A slice used anywhere else
   is an error; write `= ANY(sqlc.arg(...)::type[])` in your SQL instead of
   using `sqlc.slice`.
 
-#### Codecs
+#### One instance per query
 
-hasql has no `ToField`-style class. Its encoders and decoders are values, chosen
-per SQL type, and from 1.10 on it checks that a column's type matches the
-decoder reading it — so `text`, `varchar` and `bpchar`, all `Text` on the
-Haskell side, each need their own decoder. sqlc-hs picks the codec from the SQL
-type sqlc reported, for every type it knows.
-
-Columns typed by an `overrides` entry are a different matter: sqlc-hs cannot
-know what codec your type wants. Those go through the `ToField` and `FromField`
-classes that the generated `Queries.Internal` module declares:
+Each query module carries a [`hasql-mapping`][hasql-mapping] `IsStatement`
+instance for its parameters, which is where the SQL, the parameter encoder and
+the result decoder come together:
 
 ```haskell
-class ToField a   where toField   :: Hasql.Encoders.Value a
-class FromField a where fromField :: Hasql.Decoders.Value a
+instance IsStatement (Params "ListUsers") where
+  type Result (Params "ListUsers") = Data.Vector.Vector (Queries.Internal.Result "ListUsers")
+  statement = Hasql.Statement.preparable sql paramsEncoder (Hasql.Decoders.rowVector rowDecoder)
+    where
+      Query sql = query_ListUsers
+```
+
+The associated `Result` is what sqlc's command annotation means, spelled as a
+type: `Maybe` a row for `:one`, a `Vector` of them for `:many`, `()` for
+`:exec`, `Int64` for `:execrows`. The runners above return it, which is why they
+need no constraint beyond `IsStatement`.
+
+`paramsEncoder` and `rowDecoder` are exported too, for the cases the runners do
+not cover — folding a result, or decoding into an unboxed vector. They sit at
+fixed names in each query module, so the toplevel module re-exports every query
+module with them hidden; import the specific query module to reach them.
+
+Anything that takes an `IsStatement` — `Hasql.Mapping.IsStatement.toSession`,
+`toTransaction` — therefore works on a generated query without adapting it.
+
+#### Codecs
+
+hasql's encoders and decoders are values, chosen per SQL type, and from 1.10 on
+it checks that a column's type matches the decoder reading it — so `text`,
+`varchar` and `bpchar`, all `Text` on the Haskell side, each need their own
+decoder. sqlc-hs picks the codec from the SQL type sqlc reported, for every type
+it knows.
+
+Columns typed by an `overrides` entry are a different matter: sqlc-hs cannot
+know what codec your type wants. Those go through
+[`hasql-mapping`][hasql-mapping]'s `IsScalar`:
+
+```haskell
+class IsScalar a where
+  encoder :: Hasql.Encoders.Value a
+  decoder :: Hasql.Decoders.Value a
 ```
 
 Instances ship for `Bool`, the sized `Int`s, `Float`, `Double`, `Scientific`,
-`Char`, `Text`, `ByteString`, `UUID`, `Day`, `LocalTime`, `UTCTime`,
-`TimeOfDay`, `(TimeOfDay, TimeZone)`, `DiffTime`, `Data.Aeson.Value`, and lists
-and vectors of those. The usual overrides therefore need nothing extra — a
-`uuid` column mapped to `Data.UUID.UUID`, a `timestamptz` to `UTCTime`, a `date`
-to `Day` all work as they stand. For a type of your own, write the instance:
+`Text`, `ByteString`, `UUID`, `Day`, `LocalTime`, `UTCTime`, `TimeOfDay`,
+`(TimeOfDay, TimeZone)`, `DiffTime`, `IPRange` and `Data.Aeson.Value`. The usual
+overrides therefore need nothing extra — a `uuid` column mapped to
+`Data.UUID.UUID`, a `timestamptz` to `UTCTime`, a `date` to `Day` all work as
+they stand. For a type of your own, write the instance:
 
 ```haskell
-instance ToField UserId where
-  toField = Data.Functor.Contravariant.contramap unUserId toField
-
-instance FromField UserId where
-  fromField = fmap UserId fromField
+instance IsScalar UserId where
+  encoder = Data.Functor.Contravariant.contramap unUserId encoder
+  decoder = fmap UserId decoder
 ```
+
+`IsScalar` is scalar-only by contract, so do not instantiate it for an array
+type: an array *column* is wrapped for you from the column's own arrayness, and
+an override whose Haskell type is itself an array should name its codecs with
+`hasql_encoder` and `hasql_decoder` instead.
+
+Because the class comes from a library rather than from the generated code, the
+instance can live wherever the type does — including a package the generated one
+depends on, which an instance of a generated class could not.
+
+[hasql-mapping]: https://hackage.haskell.org/package/hasql-mapping
 
 When an instance is the wrong place for it, because the same Haskell type wants
 different codecs in different columns, an override can name the codecs itself

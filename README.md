@@ -121,9 +121,9 @@ result <-
 
 Two things work differently from the postgresql-simple driver:
 
-* There is no `fold`. Each query module exports its row decoder as
-  `rowDecoder`, so a fold is `Hasql.Decoders.foldlRows step initial rowDecoder`
-  against the statement of your choice.
+* There is no `fold`. A query's result shape is fixed by its command
+  annotation, so a query you want to fold, or to decode into something other
+  than the generated row, is a query to declare with that shape.
 * `sqlc.slice` parameters are bound as one array parameter, which PostgreSQL
   only accepts with the array operators, so `IN ($1)` is generated as
   `= ANY ($1)` and `NOT IN ($1)` as `<> ALL ($1)`. A slice used anywhere else
@@ -149,10 +149,9 @@ type: `Maybe` a row for `:one`, a `Vector` of them for `:many`, `()` for
 `:exec`, `Int64` for `:execrows`. The runners above return it, which is why they
 need no constraint beyond `IsStatement`.
 
-`paramsEncoder` and `rowDecoder` are exported too, for the cases the runners do
-not cover — folding a result, or decoding into an unboxed vector. They sit at
-fixed names in each query module, so the toplevel module re-exports every query
-module with them hidden; import the specific query module to reach them.
+The parameter encoder and row decoder are local to `statement`: the instance is
+the interface, and a query module exports nothing but its `Query`, its `Params`
+and its `Result`.
 
 Anything that takes an `IsStatement` — `Hasql.Mapping.IsStatement.toSession`,
 `toTransaction` — therefore works on a generated query without adapting it.

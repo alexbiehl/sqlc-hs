@@ -38,29 +38,28 @@ data instance Queries.Internal.Result "FindUsers" = Result_FindUsers
     id :: !(Data.Int.Int32)
   }
 
-paramsEncoder :: Hasql.Encoders.Params (Params "FindUsers")
-paramsEncoder =
-  mconcat
-    [ 
-    Data.Functor.Contravariant.contramap (\Params_FindUsers{..} -> names) (Hasql.Encoders.param (Hasql.Encoders.nonNullable (Hasql.Encoders.foldableArray (Hasql.Encoders.nonNullable Hasql.Encoders.text)))), 
-
-    Data.Functor.Contravariant.contramap (\Params_FindUsers{..} -> emails) (Hasql.Encoders.param (Hasql.Encoders.nonNullable (Hasql.Encoders.foldableArray (Hasql.Encoders.nonNullable Hasql.Encoders.text)))), 
-
-    Data.Functor.Contravariant.contramap (\Params_FindUsers{..} -> age) (Hasql.Encoders.param (Hasql.Encoders.nonNullable Hasql.Encoders.int4))
-    ]
-{-# INLINE paramsEncoder #-}
-
-rowDecoder :: Hasql.Decoders.Row (Queries.Internal.Result "FindUsers")
-rowDecoder =
-  pure Result_FindUsers
-    <*> Hasql.Decoders.column (Hasql.Decoders.nonNullable Hasql.Decoders.int4)
-{-# INLINE rowDecoder #-}
-
 instance Hasql.Mapping.IsStatement.IsStatement (Params "FindUsers") where
   type Result (Params "FindUsers") = Data.Vector.Vector (Queries.Internal.Result "FindUsers")
   statement =
     Hasql.Statement.preparable sql paramsEncoder (Hasql.Decoders.rowVector rowDecoder)
     where
       Query sql = query_FindUsers
+
+      paramsEncoder :: Hasql.Encoders.Params (Params "FindUsers")
+      paramsEncoder =
+        mconcat
+          [ 
+          Data.Functor.Contravariant.contramap (\Params_FindUsers{..} -> names) (Hasql.Encoders.param (Hasql.Encoders.nonNullable (Hasql.Encoders.foldableArray (Hasql.Encoders.nonNullable Hasql.Encoders.text)))), 
+
+          Data.Functor.Contravariant.contramap (\Params_FindUsers{..} -> emails) (Hasql.Encoders.param (Hasql.Encoders.nonNullable (Hasql.Encoders.foldableArray (Hasql.Encoders.nonNullable Hasql.Encoders.text)))), 
+
+          Data.Functor.Contravariant.contramap (\Params_FindUsers{..} -> age) (Hasql.Encoders.param (Hasql.Encoders.nonNullable Hasql.Encoders.int4))
+          ]
+      {-# INLINE paramsEncoder #-}
+      rowDecoder :: Hasql.Decoders.Row (Queries.Internal.Result "FindUsers")
+      rowDecoder =
+        pure Result_FindUsers
+          <*> Hasql.Decoders.column (Hasql.Decoders.nonNullable Hasql.Decoders.int4)
+      {-# INLINE rowDecoder #-}
 
 

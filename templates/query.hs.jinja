@@ -93,29 +93,30 @@ instance Database.PostgreSQL.Simple.FromRow.FromRow (Result {{ escapedQueryName 
     {% endfor %}
 {% endif %}
 {% if generateHasql %}
-paramsEncoder :: Hasql.Encoders.Params (Params {{ escapedQueryName }})
-paramsEncoder =
-  mconcat
-    [ {% for param in encoderColumns %}
-    Data.Functor.Contravariant.contramap (\{{ haskellParamsName }}{..} -> {{ param.value.name }}) (Hasql.Encoders.param ({{ param.value.encoder }})){% if !param.last %}, {% endif %}
-    {% endfor %}
-    ]
-{-# INLINE paramsEncoder #-}
-
-rowDecoder :: Hasql.Decoders.Row ({{ internalModuleName }}.Result {{ escapedQueryName }})
-rowDecoder =
-  pure {{ haskellResultName }}
-  {% for column in resultColumns %}
-    <*> Hasql.Decoders.column ({{ column.value.decoder }})
-  {% endfor %}
-{-# INLINE rowDecoder #-}
-
 instance Hasql.Mapping.IsStatement.IsStatement (Params {{ escapedQueryName }}) where
   type Result (Params {{ escapedQueryName }}) = {{ hasqlResultType }}
   statement =
     Hasql.Statement.preparable sql paramsEncoder ({{ hasqlResultDecoder }})
     where
       Query sql = {{ haskellQueryName }}
+
+      paramsEncoder :: Hasql.Encoders.Params (Params {{ escapedQueryName }})
+      paramsEncoder =
+        mconcat
+          [ {% for param in encoderColumns %}
+          Data.Functor.Contravariant.contramap (\{{ haskellParamsName }}{..} -> {{ param.value.name }}) (Hasql.Encoders.param ({{ param.value.encoder }})){% if !param.last %}, {% endif %}
+          {% endfor %}
+          ]
+      {-# INLINE paramsEncoder #-}
+{% if hasqlDecodesRows %}
+      rowDecoder :: Hasql.Decoders.Row ({{ internalModuleName }}.Result {{ escapedQueryName }})
+      rowDecoder =
+        pure {{ haskellResultName }}
+        {% for column in resultColumns %}
+          <*> Hasql.Decoders.column ({{ column.value.decoder }})
+        {% endfor %}
+      {-# INLINE rowDecoder #-}
+{% endif %}
 {% endif %}
 
 {% if generateSqlite %}

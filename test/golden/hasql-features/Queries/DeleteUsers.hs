@@ -32,22 +32,17 @@ data instance Queries.Internal.Result "DeleteUsers" = Result_DeleteUsers
   {
   }
 
-paramsEncoder :: Hasql.Encoders.Params (Params "DeleteUsers")
-paramsEncoder =
-  mconcat
-    [     ]
-{-# INLINE paramsEncoder #-}
-
-rowDecoder :: Hasql.Decoders.Row (Queries.Internal.Result "DeleteUsers")
-rowDecoder =
-  pure Result_DeleteUsers
-{-# INLINE rowDecoder #-}
-
 instance Hasql.Mapping.IsStatement.IsStatement (Params "DeleteUsers") where
   type Result (Params "DeleteUsers") = ()
   statement =
     Hasql.Statement.preparable sql paramsEncoder (Hasql.Decoders.noResult)
     where
       Query sql = query_DeleteUsers
+
+      paramsEncoder :: Hasql.Encoders.Params (Params "DeleteUsers")
+      paramsEncoder =
+        mconcat
+          [           ]
+      {-# INLINE paramsEncoder #-}
 
 

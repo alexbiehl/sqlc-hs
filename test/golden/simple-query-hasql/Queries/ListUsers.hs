@@ -49,33 +49,32 @@ data instance Queries.Internal.Result "ListUsers" = Result_ListUsers
     avatar :: !(GHC.Base.Maybe Data.ByteString.ByteString)
   }
 
-paramsEncoder :: Hasql.Encoders.Params (Params "ListUsers")
-paramsEncoder =
-  mconcat
-    [ 
-    Data.Functor.Contravariant.contramap (\Params_ListUsers{..} -> age) (Hasql.Encoders.param (Hasql.Encoders.nonNullable Hasql.Encoders.int4))
-    ]
-{-# INLINE paramsEncoder #-}
-
-rowDecoder :: Hasql.Decoders.Row (Queries.Internal.Result "ListUsers")
-rowDecoder =
-  pure Result_ListUsers
-    <*> Hasql.Decoders.column (Hasql.Decoders.nonNullable Hasql.Decoders.int4)
-    <*> Hasql.Decoders.column (Hasql.Decoders.nonNullable Hasql.Decoders.varchar)
-    <*> Hasql.Decoders.column (Hasql.Decoders.nullable Hasql.Decoders.text)
-    <*> Hasql.Decoders.column (Hasql.Decoders.nonNullable Hasql.Decoders.bpchar)
-    <*> Hasql.Decoders.column (Hasql.Decoders.nonNullable Hasql.Decoders.bool)
-    <*> Hasql.Decoders.column (Hasql.Decoders.nonNullable Hasql.Decoders.numeric)
-    <*> Hasql.Decoders.column (Hasql.Decoders.nullable Hasql.Decoders.float8)
-    <*> Hasql.Decoders.column (Hasql.Decoders.nonNullable Hasql.Decoders.jsonb)
-    <*> Hasql.Decoders.column (Hasql.Decoders.nullable Hasql.Decoders.bytea)
-{-# INLINE rowDecoder #-}
-
 instance Hasql.Mapping.IsStatement.IsStatement (Params "ListUsers") where
   type Result (Params "ListUsers") = Data.Vector.Vector (Queries.Internal.Result "ListUsers")
   statement =
     Hasql.Statement.preparable sql paramsEncoder (Hasql.Decoders.rowVector rowDecoder)
     where
       Query sql = query_ListUsers
+
+      paramsEncoder :: Hasql.Encoders.Params (Params "ListUsers")
+      paramsEncoder =
+        mconcat
+          [ 
+          Data.Functor.Contravariant.contramap (\Params_ListUsers{..} -> age) (Hasql.Encoders.param (Hasql.Encoders.nonNullable Hasql.Encoders.int4))
+          ]
+      {-# INLINE paramsEncoder #-}
+      rowDecoder :: Hasql.Decoders.Row (Queries.Internal.Result "ListUsers")
+      rowDecoder =
+        pure Result_ListUsers
+          <*> Hasql.Decoders.column (Hasql.Decoders.nonNullable Hasql.Decoders.int4)
+          <*> Hasql.Decoders.column (Hasql.Decoders.nonNullable Hasql.Decoders.varchar)
+          <*> Hasql.Decoders.column (Hasql.Decoders.nullable Hasql.Decoders.text)
+          <*> Hasql.Decoders.column (Hasql.Decoders.nonNullable Hasql.Decoders.bpchar)
+          <*> Hasql.Decoders.column (Hasql.Decoders.nonNullable Hasql.Decoders.bool)
+          <*> Hasql.Decoders.column (Hasql.Decoders.nonNullable Hasql.Decoders.numeric)
+          <*> Hasql.Decoders.column (Hasql.Decoders.nullable Hasql.Decoders.float8)
+          <*> Hasql.Decoders.column (Hasql.Decoders.nonNullable Hasql.Decoders.jsonb)
+          <*> Hasql.Decoders.column (Hasql.Decoders.nullable Hasql.Decoders.bytea)
+      {-# INLINE rowDecoder #-}
 
 

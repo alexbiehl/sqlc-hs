@@ -38,26 +38,25 @@ data instance Queries.Internal.Result "FindPosts" = Result_FindPosts
     labels :: !(GHC.Base.Maybe (Data.Vector.Vector Data.Text.Text))
   }
 
-paramsEncoder :: Hasql.Encoders.Params (Params "FindPosts")
-paramsEncoder =
-  mconcat
-    [ 
-    Data.Functor.Contravariant.contramap (\Params_FindPosts{..} -> tags) (Hasql.Encoders.param (Hasql.Encoders.nonNullable (Hasql.Encoders.foldableArray (Hasql.Encoders.nonNullable Hasql.Encoders.text))))
-    ]
-{-# INLINE paramsEncoder #-}
-
-rowDecoder :: Hasql.Decoders.Row (Queries.Internal.Result "FindPosts")
-rowDecoder =
-  pure Result_FindPosts
-    <*> Hasql.Decoders.column (Hasql.Decoders.nonNullable (Hasql.Decoders.vectorArray (Hasql.Decoders.nonNullable Hasql.Decoders.text)))
-    <*> Hasql.Decoders.column (Hasql.Decoders.nullable (Hasql.Decoders.vectorArray (Hasql.Decoders.nonNullable Hasql.Decoders.varchar)))
-{-# INLINE rowDecoder #-}
-
 instance Hasql.Mapping.IsStatement.IsStatement (Params "FindPosts") where
   type Result (Params "FindPosts") = Data.Vector.Vector (Queries.Internal.Result "FindPosts")
   statement =
     Hasql.Statement.preparable sql paramsEncoder (Hasql.Decoders.rowVector rowDecoder)
     where
       Query sql = query_FindPosts
+
+      paramsEncoder :: Hasql.Encoders.Params (Params "FindPosts")
+      paramsEncoder =
+        mconcat
+          [ 
+          Data.Functor.Contravariant.contramap (\Params_FindPosts{..} -> tags) (Hasql.Encoders.param (Hasql.Encoders.nonNullable (Hasql.Encoders.foldableArray (Hasql.Encoders.nonNullable Hasql.Encoders.text))))
+          ]
+      {-# INLINE paramsEncoder #-}
+      rowDecoder :: Hasql.Decoders.Row (Queries.Internal.Result "FindPosts")
+      rowDecoder =
+        pure Result_FindPosts
+          <*> Hasql.Decoders.column (Hasql.Decoders.nonNullable (Hasql.Decoders.vectorArray (Hasql.Decoders.nonNullable Hasql.Decoders.text)))
+          <*> Hasql.Decoders.column (Hasql.Decoders.nullable (Hasql.Decoders.vectorArray (Hasql.Decoders.nonNullable Hasql.Decoders.varchar)))
+      {-# INLINE rowDecoder #-}
 
 

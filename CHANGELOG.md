@@ -10,14 +10,15 @@
   instance of a generated class could not (hasql).
 * `ToRow`/`FromRow` are gone with them. Each query module now carries a
   `hasql-mapping` `IsStatement` instance, whose associated `Result` is sqlc's
-  command annotation spelled as a type, and exports its `paramsEncoder` and
-  `rowDecoder` as plain values. Anything accepting an `IsStatement` —
+  command annotation spelled as a type; the parameter encoder and row decoder
+  are local to its `statement`. Anything accepting an `IsStatement` —
   `toSession`, `toTransaction` — works on a generated query unchanged (hasql).
 * The runners keep their names, arguments and command tags, so call sites are
   unaffected; only their constraints change, from the two removed classes to
   `IsStatement` (hasql).
-* `fold` is removed. `Hasql.Decoders.foldlRows step initial rowDecoder` is the
-  replacement, using the row decoder the query module now exports (hasql).
+* `fold` is removed. A query's result shape is now fixed by its command
+  annotation, so a result you want to fold is a query to declare with that
+  shape (hasql).
 * Requires `hasql < 2.1`, which is `hasql-mapping`'s own bound (hasql).
 
 ## 0.3.0.0 -- 2026-08-20

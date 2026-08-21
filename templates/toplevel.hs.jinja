@@ -10,12 +10,5 @@ where
 import {{ internalModuleName }}
 import {{ typesModuleName }}
 {% for module in modules %}
-{% if generateHasql %}
-{# paramsEncoder and rowDecoder are per-query values at fixed names, so every
-   query module defines its own. Re-exporting them all under one alias would
-   collide; import the specific query module to reach them. #}
-import {{ module.value }} as Queries hiding (paramsEncoder, rowDecoder)
-{% else %}
 import {{ module.value }} as Queries
-{% endif %}
 {% endfor %}

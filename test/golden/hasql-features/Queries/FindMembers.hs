@@ -37,26 +37,25 @@ data instance Queries.Internal.Result "FindMembers" = Result_FindMembers
     previous_role :: !(GHC.Base.Maybe ((Queries.Types.Enum "organization_role")))
   }
 
-paramsEncoder :: Hasql.Encoders.Params (Params "FindMembers")
-paramsEncoder =
-  mconcat
-    [ 
-    Data.Functor.Contravariant.contramap (\Params_FindMembers{..} -> role) (Hasql.Encoders.param (Hasql.Encoders.nonNullable Hasql.Mapping.IsScalar.encoder))
-    ]
-{-# INLINE paramsEncoder #-}
-
-rowDecoder :: Hasql.Decoders.Row (Queries.Internal.Result "FindMembers")
-rowDecoder =
-  pure Result_FindMembers
-    <*> Hasql.Decoders.column (Hasql.Decoders.nonNullable Hasql.Mapping.IsScalar.decoder)
-    <*> Hasql.Decoders.column (Hasql.Decoders.nullable Hasql.Mapping.IsScalar.decoder)
-{-# INLINE rowDecoder #-}
-
 instance Hasql.Mapping.IsStatement.IsStatement (Params "FindMembers") where
   type Result (Params "FindMembers") = Data.Vector.Vector (Queries.Internal.Result "FindMembers")
   statement =
     Hasql.Statement.preparable sql paramsEncoder (Hasql.Decoders.rowVector rowDecoder)
     where
       Query sql = query_FindMembers
+
+      paramsEncoder :: Hasql.Encoders.Params (Params "FindMembers")
+      paramsEncoder =
+        mconcat
+          [ 
+          Data.Functor.Contravariant.contramap (\Params_FindMembers{..} -> role) (Hasql.Encoders.param (Hasql.Encoders.nonNullable Hasql.Mapping.IsScalar.encoder))
+          ]
+      {-# INLINE paramsEncoder #-}
+      rowDecoder :: Hasql.Decoders.Row (Queries.Internal.Result "FindMembers")
+      rowDecoder =
+        pure Result_FindMembers
+          <*> Hasql.Decoders.column (Hasql.Decoders.nonNullable Hasql.Mapping.IsScalar.decoder)
+          <*> Hasql.Decoders.column (Hasql.Decoders.nullable Hasql.Mapping.IsScalar.decoder)
+      {-# INLINE rowDecoder #-}
 
 

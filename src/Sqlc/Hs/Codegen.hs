@@ -100,7 +100,7 @@ codegen config generateRequest = do
       (toList (generateRequest ^. #queries))
 
   toplevelModule <-
-    codegenToplevel backend toplevelName internalName typesName modules
+    codegenToplevel toplevelName internalName typesName modules
 
   internalModule <-
     codegenInternal backend internalName
@@ -136,7 +136,6 @@ moduleToFile module_ =
     }
 
 codegenToplevel ::
-  Maybe Backend ->
   -- | ResolvedName of the toplevel module name
   ResolvedNames ->
   -- | ResolvedName of the internal module name
@@ -145,11 +144,10 @@ codegenToplevel ::
   ResolvedNames ->
   [Module] ->
   IO Module
-codegenToplevel backend toplevel internal types modulesToReexport = do
+codegenToplevel toplevel internal types modulesToReexport = do
   let context =
         Text.EDE.fromPairs
-          [ "generateHasql" Text.EDE..= (backend == Just Hasql),
-            "moduleName" Text.EDE..= toplevel.toHaskellModuleName,
+          [ "moduleName" Text.EDE..= toplevel.toHaskellModuleName,
             "internalModuleName" Text.EDE..= internal.toHaskellModuleName,
             "typesModuleName" Text.EDE..= types.toHaskellModuleName,
             "modules" Text.EDE..= fmap (.name) modulesToReexport
@@ -450,7 +448,11 @@ codegenQuery backend engine resolveOverride internalModule resolveName resolver 
             "encoderColumns" Text.EDE..= fmap (toParameterColumn . snd) (sortOn fst parameterColumns),
             "resultColumns" Text.EDE..= fmap toResultColumn resultColumns,
             "hasqlResultType" Text.EDE..= hasqlResultType,
-            "hasqlResultDecoder" Text.EDE..= hasqlResultDecoder
+            "hasqlResultDecoder" Text.EDE..= hasqlResultDecoder,
+            -- Whether the result decoder reads rows at all, so the row decoder
+            -- is only bound for the commands that use it and does not sit there
+            -- unused under -Wall.
+            "hasqlDecodesRows" Text.EDE..= ((query ^. #cmd) `elem` [":one" :: Text, ":many"])
           ]
 
       -- What 'Hasql.Mapping.IsStatement.Result' is for this query, and the

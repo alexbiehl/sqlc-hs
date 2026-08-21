@@ -8,9 +8,15 @@
 {-# LANGUAGE TypeFamilies #-}
 module Queries.DeleteUsers where
 
-import Queries.Internal (Query(..), Enum, Params, Result, ToRow(..), FromRow(..), ToField(..), FromField(..))
+import Queries.Internal (Query(..), Enum, Params)
+import qualified Queries.Internal
+import qualified Data.Int
+import qualified Data.Vector
 import qualified Hasql.Decoders
 import qualified Hasql.Encoders
+import qualified Hasql.Mapping.IsScalar
+import qualified Hasql.Mapping.IsStatement
+import qualified Hasql.Statement
 
 import qualified Data.Foldable
 import qualified Data.Functor.Contravariant
@@ -22,19 +28,21 @@ data instance Params "DeleteUsers" = Params_DeleteUsers
   {
   }
 
-data instance Result "DeleteUsers" = Result_DeleteUsers
+data instance Queries.Internal.Result "DeleteUsers" = Result_DeleteUsers
   {
   }
 
-instance ToRow (Params "DeleteUsers") where
-  {-# INLINE toRow #-}
-  toRow =
-    mconcat
-      [       ]
+instance Hasql.Mapping.IsStatement.IsStatement (Params "DeleteUsers") where
+  type Result (Params "DeleteUsers") = ()
+  statement =
+    Hasql.Statement.preparable sql paramsEncoder (Hasql.Decoders.noResult)
+    where
+      Query sql = query_DeleteUsers
 
-instance FromRow (Result "DeleteUsers") where
-  {-# INLINE fromRow #-}
-  fromRow =
-    pure Result_DeleteUsers
+      paramsEncoder :: Hasql.Encoders.Params (Params "DeleteUsers")
+      paramsEncoder =
+        mconcat
+          [           ]
+      {-# INLINE paramsEncoder #-}
 
 

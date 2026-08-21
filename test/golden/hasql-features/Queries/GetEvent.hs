@@ -8,9 +8,15 @@
 {-# LANGUAGE TypeFamilies #-}
 module Queries.GetEvent where
 
-import Queries.Internal (Query(..), Enum, Params, Result, ToRow(..), FromRow(..), ToField(..), FromField(..))
+import Queries.Internal (Query(..), Enum, Params)
+import qualified Queries.Internal
+import qualified Data.Int
+import qualified Data.Vector
 import qualified Hasql.Decoders
 import qualified Hasql.Encoders
+import qualified Hasql.Mapping.IsScalar
+import qualified Hasql.Mapping.IsStatement
+import qualified Hasql.Statement
 
 import qualified Data.UUID
 import qualified Data.Time
@@ -26,7 +32,7 @@ data instance Params "GetEvent" = Params_GetEvent
     since :: Data.Time.UTCTime
   }
 
-data instance Result "GetEvent" = Result_GetEvent
+data instance Queries.Internal.Result "GetEvent" = Result_GetEvent
   {
     id :: !(Data.UUID.UUID),
     created_at :: !(Data.Time.UTCTime),
@@ -34,23 +40,29 @@ data instance Result "GetEvent" = Result_GetEvent
     legacy_at :: !(Data.Time.UTCTime)
   }
 
-instance ToRow (Params "GetEvent") where
-  {-# INLINE toRow #-}
-  toRow =
-    mconcat
-      [ 
-      Data.Functor.Contravariant.contramap (\Params_GetEvent{..} -> id) (Hasql.Encoders.param (Hasql.Encoders.nonNullable toField)), 
+instance Hasql.Mapping.IsStatement.IsStatement (Params "GetEvent") where
+  type Result (Params "GetEvent") = Prelude.Maybe (Queries.Internal.Result "GetEvent")
+  statement =
+    Hasql.Statement.preparable sql paramsEncoder (Hasql.Decoders.rowMaybe rowDecoder)
+    where
+      Query sql = query_GetEvent
 
-      Data.Functor.Contravariant.contramap (\Params_GetEvent{..} -> since) (Hasql.Encoders.param (Hasql.Encoders.nonNullable (Data.Functor.Contravariant.contramap (Data.Time.utcToLocalTime Data.Time.utc) Hasql.Encoders.timestamp)))
-      ]
+      paramsEncoder :: Hasql.Encoders.Params (Params "GetEvent")
+      paramsEncoder =
+        mconcat
+          [ 
+          Data.Functor.Contravariant.contramap (\Params_GetEvent{..} -> id) (Hasql.Encoders.param (Hasql.Encoders.nonNullable Hasql.Mapping.IsScalar.encoder)), 
 
-instance FromRow (Result "GetEvent") where
-  {-# INLINE fromRow #-}
-  fromRow =
-    pure Result_GetEvent
-      <*> Hasql.Decoders.column (Hasql.Decoders.nonNullable fromField)
-      <*> Hasql.Decoders.column (Hasql.Decoders.nonNullable fromField)
-      <*> Hasql.Decoders.column (Hasql.Decoders.nullable fromField)
-      <*> Hasql.Decoders.column (Hasql.Decoders.nonNullable (fmap (Data.Time.localTimeToUTC Data.Time.utc) Hasql.Decoders.timestamp))
+          Data.Functor.Contravariant.contramap (\Params_GetEvent{..} -> since) (Hasql.Encoders.param (Hasql.Encoders.nonNullable (Data.Functor.Contravariant.contramap (Data.Time.utcToLocalTime Data.Time.utc) Hasql.Encoders.timestamp)))
+          ]
+      {-# INLINE paramsEncoder #-}
+      rowDecoder :: Hasql.Decoders.Row (Queries.Internal.Result "GetEvent")
+      rowDecoder =
+        pure Result_GetEvent
+          <*> Hasql.Decoders.column (Hasql.Decoders.nonNullable Hasql.Mapping.IsScalar.decoder)
+          <*> Hasql.Decoders.column (Hasql.Decoders.nonNullable Hasql.Mapping.IsScalar.decoder)
+          <*> Hasql.Decoders.column (Hasql.Decoders.nullable Hasql.Mapping.IsScalar.decoder)
+          <*> Hasql.Decoders.column (Hasql.Decoders.nonNullable (fmap (Data.Time.localTimeToUTC Data.Time.utc) Hasql.Decoders.timestamp))
+      {-# INLINE rowDecoder #-}
 
 

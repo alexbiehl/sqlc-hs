@@ -16,9 +16,19 @@ import qualified Database.PostgreSQL.Simple.ToField
 import qualified Database.PostgreSQL.Simple.ToRow
 {% endif %}
 {% if generateHasql %}
-import {{ internalModuleName }} (Query(..), Enum, Params, Result, ToRow(..), FromRow(..), ToField(..), FromField(..))
+import {{ internalModuleName }} (Query(..), Enum, Params)
+{# The row type is named `Result`, and so is IsStatement's associated type. GHC
+   rejects a qualified name on the left of an associated type instance
+   (GHC-28329), so it is the row family that gets qualified instead. Kept as a
+   template comment: it explains this template, not the code it emits. #}
+import qualified {{ internalModuleName }}
+import qualified Data.Int
+import qualified Data.Vector
 import qualified Hasql.Decoders
 import qualified Hasql.Encoders
+import qualified Hasql.Mapping.IsScalar
+import qualified Hasql.Mapping.IsStatement
+import qualified Hasql.Statement
 {% endif %}
 {% if generateSqlite %}
 import {{ internalModuleName }} (Query(..), Enum, Params, Result)
@@ -48,7 +58,11 @@ data instance Params {{ escapedQueryName }} = {{ haskellParamsName }}
   {% endfor %}
   }
 
+{% if generateHasql %}
+data instance {{ internalModuleName }}.Result {{ escapedQueryName }} = {{ haskellResultName }}
+{% else %}
 data instance Result {{ escapedQueryName }} = {{ haskellResultName }}
+{% endif %}
   {
   {% for column in resultColumns  %}
     {{ column.value.name }} :: !({{ column.value.type }}){% if !column.last %},{% endif %}
@@ -79,22 +93,30 @@ instance Database.PostgreSQL.Simple.FromRow.FromRow (Result {{ escapedQueryName 
     {% endfor %}
 {% endif %}
 {% if generateHasql %}
-instance ToRow (Params {{ escapedQueryName }}) where
-  {-# INLINE toRow #-}
-  toRow =
-    mconcat
-      [ {% for param in encoderColumns %}
-      Data.Functor.Contravariant.contramap (\{{ haskellParamsName }}{..} -> {{ param.value.name }}) (Hasql.Encoders.param ({{ param.value.encoder }})){% if !param.last %}, {% endif %}
-      {% endfor %}
-      ]
+instance Hasql.Mapping.IsStatement.IsStatement (Params {{ escapedQueryName }}) where
+  type Result (Params {{ escapedQueryName }}) = {{ hasqlResultType }}
+  statement =
+    Hasql.Statement.preparable sql paramsEncoder ({{ hasqlResultDecoder }})
+    where
+      Query sql = {{ haskellQueryName }}
 
-instance FromRow (Result {{ escapedQueryName }}) where
-  {-# INLINE fromRow #-}
-  fromRow =
-    pure {{ haskellResultName }}
-    {% for column in resultColumns %}
-      <*> Hasql.Decoders.column ({{ column.value.decoder }})
-    {% endfor %}
+      paramsEncoder :: Hasql.Encoders.Params (Params {{ escapedQueryName }})
+      paramsEncoder =
+        mconcat
+          [ {% for param in encoderColumns %}
+          Data.Functor.Contravariant.contramap (\{{ haskellParamsName }}{..} -> {{ param.value.name }}) (Hasql.Encoders.param ({{ param.value.encoder }})){% if !param.last %}, {% endif %}
+          {% endfor %}
+          ]
+      {-# INLINE paramsEncoder #-}
+{% if hasqlDecodesRows %}
+      rowDecoder :: Hasql.Decoders.Row ({{ internalModuleName }}.Result {{ escapedQueryName }})
+      rowDecoder =
+        pure {{ haskellResultName }}
+        {% for column in resultColumns %}
+          <*> Hasql.Decoders.column ({{ column.value.decoder }})
+        {% endfor %}
+      {-# INLINE rowDecoder #-}
+{% endif %}
 {% endif %}
 
 {% if generateSqlite %}

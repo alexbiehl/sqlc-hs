@@ -908,10 +908,10 @@ queryParamBindings engine query =
 --
 -- An override that carries @hasql_encoder@ / @hasql_decoder@ decides the codec
 -- outright. Failing that, an override that chose the column's Haskell type also
--- decides its codec, so we go through the generated @ToField@ / @FromField@
--- classes, which the user can instantiate for whatever type they picked. Only
--- when sqlc-hs typed the column itself do we know the codec, and then we take
--- it from the SQL type.
+-- decides its codec, so we go through @hasql-mapping@'s 'IsScalar', which the
+-- user can instantiate for whatever type they picked. Only when sqlc-hs typed
+-- the column itself do we know the codec, and then we take it from the SQL
+-- type.
 hasqlColumnCodec ::
   -- | The override that matched the column, if any
   Maybe Override ->
@@ -931,8 +931,11 @@ hasqlColumnCodec override column =
         Nothing ->
           fromMaybe classCodec (hasqlValueCodec (columnDataType (column ^. #type')))
 
+    -- One class with both methods, rather than the two sqlc-hs used to
+    -- declare itself. Scalar-only by contract, which is why the array wrapping
+    -- above stays outside it.
     classCodec =
-      ("toField", "fromField")
+      ("Hasql.Mapping.IsScalar.encoder", "Hasql.Mapping.IsScalar.decoder")
 
 -- | hasql's codec for a PostgreSQL type, as @(encoder, decoder)@ expressions.
 --

@@ -12,6 +12,7 @@ module Queries.Types where
 
 import qualified Hasql.Decoders
 import qualified Hasql.Encoders
+import qualified Hasql.Mapping.IsScalar
 import Queries.Internal
 import Prelude hiding (Enum)
 import qualified Prelude
@@ -22,16 +23,14 @@ data instance Enum "organization_role"
   | Enum_organization_role_member
   deriving stock (Eq, Ord, Show, Bounded, Prelude.Enum)
 
-instance ToField (Enum "organization_role") where
-  toField =
+instance Hasql.Mapping.IsScalar.IsScalar (Enum "organization_role") where
+  encoder =
     Hasql.Encoders.enum Prelude.Nothing "organization_role" $ \x ->
       case x of
         Enum_organization_role_owner -> "owner"
         Enum_organization_role_admin -> "admin"
         Enum_organization_role_member -> "member"
-
-instance FromField (Enum "organization_role") where
-  fromField =
+  decoder =
     Hasql.Decoders.enum Prelude.Nothing "organization_role" $ \x ->
       case x of
         "owner" -> Prelude.Just Enum_organization_role_owner

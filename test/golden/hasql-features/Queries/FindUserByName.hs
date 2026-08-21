@@ -9,9 +9,6 @@
 module Queries.FindUserByName where
 
 import Queries.Internal (Query(..), Enum, Params)
--- The row type is named `Result`, and so is IsStatement's associated type. GHC
--- rejects a qualified name on the left of an associated type instance, so it is
--- the row family that gets qualified here instead.
 import qualified Queries.Internal
 import qualified Data.Int
 import qualified Data.Vector

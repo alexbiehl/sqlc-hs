@@ -17,9 +17,10 @@ import qualified Database.PostgreSQL.Simple.ToRow
 {% endif %}
 {% if generateHasql %}
 import {{ internalModuleName }} (Query(..), Enum, Params)
--- The row type is named `Result`, and so is IsStatement's associated type. GHC
--- rejects a qualified name on the left of an associated type instance, so it is
--- the row family that gets qualified here instead.
+{# The row type is named `Result`, and so is IsStatement's associated type. GHC
+   rejects a qualified name on the left of an associated type instance
+   (GHC-28329), so it is the row family that gets qualified instead. Kept as a
+   template comment: it explains this template, not the code it emits. #}
 import qualified {{ internalModuleName }}
 import qualified Data.Int
 import qualified Data.Vector

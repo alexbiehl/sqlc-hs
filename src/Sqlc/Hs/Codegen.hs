@@ -209,11 +209,13 @@ codegenInternal backend internal = do
           )
         Just Hasql ->
           ( internalHasqlTemplate,
-            -- The ToField/FromField instances the internal module ships cover
-            -- the types the built-in mappings and the common overrides use.
-            -- Every one of these packages is already in hasql's own dependency
+            -- hasql-mapping supplies IsScalar, the codec class an override's
+            -- type is resolved through, and IsStatement, which the per-query
+            -- modules instantiate. The rest are for the types the built-in
+            -- mappings use, and are all already in hasql's own dependency
             -- closure, so none of them costs an extra build.
             [ HaskellType {package = Just "hasql", module' = Just "Hasql.Session", name = Just "Session"},
+              HaskellType {package = Just "hasql-mapping", module' = Just "Hasql.Mapping.IsScalar", name = Just "IsScalar"},
               HaskellType {package = Just "aeson", module' = Just "Data.Aeson", name = Just "Value"},
               HaskellType {package = Just "scientific", module' = Just "Data.Scientific", name = Just "Scientific"},
               HaskellType {package = Just "time", module' = Just "Data.Time", name = Just "UTCTime"},
@@ -444,8 +446,49 @@ codegenQuery backend engine resolveOverride internalModule resolveName resolver 
             "parameterColumns" Text.EDE..= fmap (toParameterColumn . snd) parameterColumns,
             "queryColumns" Text.EDE..= fmap toParameterColumn (toQueryColumns parameterColumns),
             "encoderColumns" Text.EDE..= fmap (toParameterColumn . snd) (sortOn fst parameterColumns),
-            "resultColumns" Text.EDE..= fmap toResultColumn resultColumns
+            "resultColumns" Text.EDE..= fmap toResultColumn resultColumns,
+            "hasqlResultType" Text.EDE..= hasqlResultType,
+            "hasqlResultDecoder" Text.EDE..= hasqlResultDecoder,
+            -- Whether the result decoder reads rows at all, so the row decoder
+            -- is only bound for the commands that use it and does not sit there
+            -- unused under -Wall.
+            "hasqlDecodesRows" Text.EDE..= ((query ^. #cmd) `elem` [":one" :: Text, ":many"])
           ]
+
+      -- What 'Hasql.Mapping.IsStatement.Result' is for this query, and the
+      -- 'Hasql.Decoders.Result' that produces it. sqlc's command annotation
+      -- decides both, so the class carries what the per-command runners used to
+      -- express in their types.
+      (hasqlResultType, hasqlResultDecoder) =
+        case query ^. #cmd of
+          ":one" ->
+            ( "Prelude.Maybe (" <> rowType <> ")",
+              "Hasql.Decoders.rowMaybe rowDecoder"
+            )
+          ":many" ->
+            ( "Data.Vector.Vector (" <> rowType <> ")",
+              "Hasql.Decoders.rowVector rowDecoder"
+            )
+          ":execrows" ->
+            ("Data.Int.Int64", "Hasql.Decoders.rowsAffected")
+          ":execresult" ->
+            ( internalModule.toHaskellModuleName <> ".ExecResult",
+              "Prelude.fmap "
+                <> internalModule.toHaskellModuleName
+                <> ".ExecResult Hasql.Decoders.rowsAffected"
+            )
+          -- One statement per set of parameters, so the result is per set too;
+          -- the caller pipelines them and folds the counts.
+          ":copyfrom" ->
+            ("Data.Int.Int64", "Hasql.Decoders.rowsAffected")
+          -- ":exec" and anything sqlc adds later: no rows to decode.
+          _ ->
+            ("()", "Hasql.Decoders.noResult")
+        where
+          rowType =
+            internalModule.toHaskellModuleName
+              <> ".Result "
+              <> show @Text (query ^. #name)
 
   pure
     Module

@@ -8,6 +8,7 @@ library
     bytestring,
     ghc-prim,
     hasql,
+    hasql-mapping,
     scientific,
     text,
     time,

@@ -1,6 +1,6 @@
 # Revision history for sqlc-haskell
 
-## Unreleased
+## 0.4.0.0 -- 2026-09-25
 
 * The hasql driver no longer declares codec classes of its own. Overrides go
   through `hasql-mapping`'s `IsScalar`, which has both `encoder` and `decoder`
